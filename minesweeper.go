@@ -3,6 +3,7 @@ package main
 import (
 	"math"
 	"math/rand/v2"
+	"time"
 )
 
 type Cell struct {
@@ -15,11 +16,13 @@ type Cell struct {
 type Cells = []Cell
 
 type Minefield struct {
-	Width  int
-	Height int
-	Cells  int
-	Mines  int
-	Cell   Cells
+	Width          int
+	Height         int
+	Cells          int
+	Mines          int
+	Cell           Cells
+	First          bool
+	StartTimeStamp int64
 }
 type Result struct {
 	IsWin       bool
@@ -33,7 +36,25 @@ type ChangeCell struct {
 	Cell   Cells
 }
 
-func (m Minefield) openCells(id int) ChangeCell {
+type Request struct {
+	Id        int
+	TimeStamp int64
+}
+
+type Response struct {
+	ChangeCell     ChangeCell
+	TimeStamp      int64
+	StartTimeStamp int64
+}
+
+func (m *Minefield) openCells(id int) ChangeCell {
+	if m.First {
+		m.StartTimeStamp = time.Now().UnixMilli()
+		m.First = false
+		ignoreCells := m.getNearbyCells(id)
+		m.randomShot(ignoreCells)
+		m.countMines()
+	}
 	var changes []Cell
 	m.Cell[id].IsOpen = true
 	if m.Cell[id].Mines == 0 {
@@ -44,7 +65,7 @@ func (m Minefield) openCells(id int) ChangeCell {
 	return ChangeCell{stats, changes}
 }
 
-func (m Minefield) getNearbyCells(id int) []int {
+func (m *Minefield) getNearbyCells(id int) []int {
 	var nearbyCells []int
 	width := m.Width
 	height := m.Height
@@ -82,7 +103,7 @@ func (m Minefield) getNearbyCells(id int) []int {
 	return nearbyCells
 }
 
-func (m Minefield) autoOpenCells(id int) Cells {
+func (m *Minefield) autoOpenCells(id int) Cells {
 	var changes []Cell
 	round := m.getNearbyCells(id)
 	for i := 0; i < len(round); i++ {
@@ -98,7 +119,7 @@ func (m Minefield) autoOpenCells(id int) Cells {
 	return changes
 }
 
-func (m Minefield) getChangeCells(changeCell []int) Cells {
+func (m *Minefield) getChangeCells(changeCell []int) Cells {
 	var change Cells
 	for i := 0; i < len(changeCell); i++ {
 		change = append(change, m.Cell[i])
@@ -106,7 +127,7 @@ func (m Minefield) getChangeCells(changeCell []int) Cells {
 	return change
 }
 
-func (m Minefield) isLost() bool {
+func (m *Minefield) isLost() bool {
 	for i, n := 0, len(m.Cell); i < n; i++ {
 		if m.Cell[i].IsOpen && m.Cell[i].IsMine {
 			return true
@@ -115,10 +136,21 @@ func (m Minefield) isLost() bool {
 	return false
 }
 
-func (m Minefield) randomShot() {
+func (m *Minefield) randomShot(ignore []int) {
+	contain := func(arr []int, target int) bool {
+		for _, v := range arr {
+			if v == target {
+				return true
+			}
+		}
+		return false
+	}
 	count := 0
 	for {
 		randInt := rand.IntN(m.Cells)
+		if contain(ignore, randInt) {
+			continue
+		}
 		if m.Cell[randInt].IsMine {
 			continue
 		} else {
@@ -131,7 +163,7 @@ func (m Minefield) randomShot() {
 	}
 }
 
-func (m Minefield) countMines() {
+func (m *Minefield) countMines() {
 	for id := 0; id < m.Cells; id++ {
 		round := m.getNearbyCells(id)
 		var count = 0
@@ -144,7 +176,7 @@ func (m Minefield) countMines() {
 	}
 }
 
-func (m Minefield) openMinefield() Minefield {
+func (m *Minefield) openMinefield() Minefield {
 	var om Minefield
 	om.Mines = m.Mines
 	om.Width = m.Width
@@ -161,7 +193,7 @@ func (m Minefield) openMinefield() Minefield {
 	return om
 }
 
-func (m Minefield) getStats(id int) Result {
+func (m *Minefield) getStats(id int) Result {
 	RemainCells := 0
 	isWin := false
 	isBoom := false
@@ -186,17 +218,9 @@ func newMinefield(mines, width, height int) Minefield {
 	m.Height = height
 	m.Cells = width * height
 	m.Cell = make([]Cell, m.Cells)
+	m.First = true
 	for i := 0; i < m.Cells; i++ {
 		m.Cell[i] = Cell{i, 0, false, false, false}
-		//fmt.Println(i)
-	}
-	m.randomShot()
-	m.countMines()
-	count := 0
-	for i := 0; i < m.Cells; i++ {
-		if m.Cell[i].IsMine {
-			count++
-		}
 	}
 	return m
 }

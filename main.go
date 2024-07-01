@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"net/http"
-	"strconv"
 	"sync"
 )
 
@@ -33,10 +33,19 @@ var pool = WebSocketPool{
 	connections: make(map[*websocket.Conn]bool),
 }
 
+const MINES = 99
+const WIDTH = 30
+const HEIGHT = 16
+
 func main() {
-	var m = newMinefield(99, 30, 16)
-	//fmt.Printf("%+v\n\n", m)
+	var m = newMinefield(MINES, WIDTH, HEIGHT)
 	app := fiber.New()
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "http://localhost:5173",
+		AllowHeaders: "Origin, Content-Type, Accept",
+		AllowMethods: "GET,POST,HEAD,PUT,DELETE,PATCH,OPTIONS",
+	}))
 
 	app.Use("/", filesystem.New(filesystem.Config{
 		Root:       http.FS(distFiles),
@@ -53,6 +62,16 @@ func main() {
 	app.Post("/login", login)
 	app.Post("/getMinefield", func(c *fiber.Ctx) error {
 		return c.JSON(m.openMinefield())
+	})
+
+	app.Post("/newGame", func(c *fiber.Ctx) error {
+		stats := m.getStats(0)
+		if stats.IsWin {
+			m = newMinefield(MINES, WIDTH, HEIGHT)
+			return c.JSON(fiber.Map{"result": "ok"})
+		} else {
+			return c.JSON(fiber.Map{"result": "fail"})
+		}
 	})
 
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -119,9 +138,18 @@ func main() {
 				log.Println("read:", err)
 				break
 			}
-			id, err := strconv.Atoi(string(msg))
-			result := m.openCells(id)
-			jsonData, err := json.Marshal(result)
+			var message Request
+			if err := json.Unmarshal(msg, &message); err != nil {
+				log.Println("Unmarshal error:", err)
+				continue
+			}
+			var response Response
+			result := m.openCells(message.Id)
+			response.ChangeCell = result
+			response.TimeStamp = message.TimeStamp
+			response.StartTimeStamp = m.StartTimeStamp
+
+			jsonData, err := json.Marshal(response)
 			if err != nil {
 				fmt.Println(err)
 			}

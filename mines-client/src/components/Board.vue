@@ -1,9 +1,11 @@
 <template>
   <div class="board">
-    <div v-for="(cell, index) in minefield.Cell" :key="index" :style="{position: 'absolute', top: Math.floor(index/minefield.Width)*94+'px', left: (index%minefield.Width)*94+'px'}"
+    <div class="timeWatcher">{{ timeWatcher }}</div>
+    <div v-for="(cell, index) in minefield.Cell" :key="index"
+         :style="{position: 'absolute', top: Math.floor(index/minefield.Width)*94+'px', left: (index%minefield.Width)*94+'px',
+         backgroundImage: `url(${getImageSrc(cell)})`}"
          class="cell"
          @mousedown="(event) => handleClick(event,index)">
-      <img :alt="String(index)" :src="getImageSrc(cell)">
     </div>
   </div>
 </template>
@@ -11,7 +13,9 @@
 <script lang="ts" setup>
 import {ref} from 'vue'
 import axios from 'axios'
-
+let host = window.location.hostname
+let port = window.location.port
+console.log(host)
 type Cell = { Id: number, Mines: number, IsMine: boolean, IsOpen: boolean, IsFlagged: boolean }
 type Result = {
   Cell: Cell[],
@@ -19,15 +23,25 @@ type Result = {
     IsWin: boolean,
     IsBoom: boolean,
     RemainCells: boolean,
-    Message: string
+    Message: string,
+    TimeStamp: number,
   },
 }
+
+type Response = {
+  ChangeCell: Result
+  TimeStamp: number
+  StartTimeStamp: number
+}
+
 type Minefield = {
   Width: number
   Height: number
   Cells: number
   Mines: number
   Cell: Cell[]
+  First: boolean
+  StartTimeStamp: number
 }
 
 const minefield = ref<Minefield>({
@@ -35,25 +49,44 @@ const minefield = ref<Minefield>({
   Height: 4,
   Cells: 20,
   Mines: 5,
-  Cell: []
+  Cell: [],
+  First: false,
+  StartTimeStamp: 0,
 })
 
+const isWin = ref(false)
+const timeWatcher = ref('00:000')
+let startTimeStamp = 0
 document.oncontextmenu = () => false;
 
 const reConnect = () => {
   const token = localStorage.getItem('jwt')
-  return new WebSocket(`ws://127.0.0.1:3000/ws/101?token=${token}`);
+  return new WebSocket(`ws://${host}:${port}/ws/101?token=${token}`);
 }
 const getBoard = async () => {
   let config = {
     method: 'post',
-    url: `http://127.0.0.1:3000/getMinefield`,
+    url: `http://${host}:${port}/getMinefield`,
     headers: {
       'Content-Type': 'application/xml',
       'Accept': '*/*',
     }
   };
-  minefield.value = (await axios(config)).data
+  let board = (await axios(config)).data
+  console.log(board)
+  minefield.value = board
+}
+
+const getNewGame = async () => {
+  let config = {
+    method: 'post',
+    url: `http://${host}:${port}/newGame`,
+    headers: {
+      'Content-Type': 'application/xml',
+      'Accept': '*/*',
+    }
+  };
+  await axios(config)
 }
 
 let ws = reConnect()
@@ -101,7 +134,7 @@ const doFlag = (index: number) => {
     if (flagCount === cell.Mines) {
       let unFlaggedCells = getNearbyUnFlaggedCells(nearbyCells)
       for (let i of unFlaggedCells) {
-        doOpen(i)
+        doOpen(i, 0)
       }
     }
   } else {
@@ -109,7 +142,7 @@ const doFlag = (index: number) => {
   }
 }
 
-const doOpen = (index: number) => {
+const doOpen = (index: number, now: number) => {
   const cell = minefield.value.Cell[index]
   let nearbyCells = getNearbyCells(index)
   if (cell.IsOpen && !cell.IsMine) {
@@ -120,29 +153,41 @@ const doOpen = (index: number) => {
     if (flagCount === cell.Mines) {
       let unFlaggedCells = getNearbyUnFlaggedCells(nearbyCells)
       for (let i of unFlaggedCells) {
-        doOpen(i)
+        doOpen(i, now)
       }
     }
   }
   cell.IsOpen = !cell.IsOpen;
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(index.toString());
+    let data = {
+      Id: index,
+      TimeStamp: now
+    }
+    ws.send(JSON.stringify(data));
   }
   if (cell.Mines === 0) {
     for (let i = 0; i < nearbyCells.length; i++) {
-      doOpen(nearbyCells[i])
+      doOpen(nearbyCells[i], now)
     }
   }
 }
 
+let timer = false
 const handleClick = (event: MouseEvent, index: number) => {
+  let now = new Date().getTime()
+  if (!timer) {
+    timer = true
+    setInterval(() => {
+      let now1 = new Date().getTime()
+      timeWatcher.value = msToTime(now1 - startTimeStamp)
+    }, 1)
+  }
   if (event.button === 2) {
     doFlag(index)
   } else if (event.button === 0) {
-    doOpen(index)
+    doOpen(index, now)
   }
 }
-
 
 const getImageSrc = (cell: Cell) => {
   let mines = cell.Mines
@@ -150,7 +195,7 @@ const getImageSrc = (cell: Cell) => {
     if (cell.IsMine && cell.IsOpen) {
       return `/src/assets/themes/wom/flag.png`
     }
-    if(cell.Mines === 9){
+    if (cell.Mines === 9) {
       return `/src/assets/themes/wom/closed.png`
     }
     return `/src/assets/themes/wom/type${mines}.png`
@@ -194,13 +239,26 @@ const getNearbyCells = (cell: number) => {
   return nearbyCells;
 }
 
-ws.onmessage = (event) => {
-  const data: Result = JSON.parse(event.data);
-  for (let i = 0; i < data.Cell.length; i++) {
-    minefield.value.Cell[data.Cell[i].Id] = data.Cell[i]
+function msToTime(duration: number): string {
+  const milliseconds = duration % 1000;
+  const seconds = Math.floor((duration / 1000));
+  const secondsStr = (seconds < 10) ? "0" + seconds : seconds;
+
+  return `${secondsStr}:${milliseconds}`;
+}
+
+ws.onmessage = async (event) => {
+  const data: Response = JSON.parse(event.data);
+  for (let i = 0; i < data.ChangeCell.Cell.length; i++) {
+    minefield.value.Cell[data.ChangeCell.Cell[i].Id] = data.ChangeCell.Cell[i]
   }
-  if (data.Result.IsWin) {
-    alert('你赢了！')
+  startTimeStamp = data.StartTimeStamp
+  if (data.ChangeCell.Result.IsWin) {
+    let newGame = confirm(`你赢了！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`)
+    if (newGame) {
+      await getNewGame()
+      await getBoard()
+    }
   }
 }
 
@@ -211,6 +269,15 @@ ws.onmessage = (event) => {
   position: relative;
   left: 10px;
   top: 10px;
+}
+
+.timeWatcher {
+  position: absolute;
+  top: -100px;
+  left: 20px;
+  font-size: 48px;
+  font-weight: bold;
+  color: #00bd7e;
 }
 
 .cell {
