@@ -11,7 +11,7 @@ loggedIn.value = !!localStorage.getItem('jwt');
 <template>
   <main class="container">
     <Board v-if="loggedIn"></Board>
-    <Login v-if="!loggedIn" class="board"></Login>
+    <Login v-if="!loggedIn" class="board" v-model="loggedIn"></Login>
   </main>
 </template>
 

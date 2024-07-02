@@ -28,11 +28,15 @@
 
 <script lang="ts" setup>
 import {ElButton, ElMessage} from 'element-plus'
-import {ref} from 'vue'
+import {ref, defineModel} from 'vue'
 import axios from "axios";
 import {useRouter} from "vue-router";
 
 const router = useRouter();
+let host = window.location.hostname
+let port = window.location.port
+
+const loggedIn = defineModel<boolean>({ required: true })
 
 const shared = ref({
   showPass: false,
@@ -45,7 +49,7 @@ async function login() {
   try {
     let config = {
       method: 'post',
-      url: `http://127.0.0.1:3000/login?user=${userId}&pass=${password}`,
+      url: `http://${host}:${port}/login?user=${userId}&pass=${password}`,
       headers: {
         'Content-Type': 'application/xml',
         'Accept': '*/*',
@@ -53,6 +57,7 @@ async function login() {
     };
     const response = await axios(config);
     const token = response.data.token;
+    loggedIn.value = true;
     localStorage.setItem('jwt', token);
   } catch (error) {
     console.log(error)
