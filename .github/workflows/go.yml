@@ -1,0 +1,39 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    - name: setup node20
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+    - name: install-deps
+      run: rm -f mines-client/package-lock.json && cd mines-client && npm install
+      
+    - name: build-client
+      run: cd mines-client && npm run build
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.22.4'
+
+    - name: Build
+      run: go build -o output/mines
+      
+    - name: upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: mines
+        path: output/mines
+
