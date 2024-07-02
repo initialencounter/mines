@@ -18,7 +18,7 @@ jobs:
       with:
         node-version: 20
     - name: install-deps
-      run: rm -f mines-client/package-lock.json && cd mines-client && npm install
+      run: cd mines-client && npm install
       
     - name: build-client
       run: cd mines-client && npm run build
