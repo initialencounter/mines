@@ -38,11 +38,4 @@ defineExpose({
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
-.fade-enter-active, .fade-leave-active {
-  transition: opacity 0.5s;
-}
-
-.fade-enter-from, .fade-leave-to {
-  opacity: 0;
-}
 </style>

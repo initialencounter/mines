@@ -12,7 +12,7 @@
 </template>
 
 <script lang="ts" setup>
-import {defineModel, ref} from 'vue'
+import { ref } from 'vue'
 import Toast from "@/components/Toast.vue";
 import axios from 'axios'
 let host = window.location.hostname
