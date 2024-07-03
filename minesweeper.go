@@ -42,6 +42,9 @@ type Request struct {
 }
 
 type Response struct {
+	PlayerQuit     bool
+	NewPlayer      bool
+	UserId         string
 	ChangeCell     ChangeCell
 	TimeStamp      int64
 	StartTimeStamp int64

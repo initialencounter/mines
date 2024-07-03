@@ -8,14 +8,15 @@
          @mousedown="(event) => handleClick(event,index)">
     </div>
   </div>
+  <Toast ref="toast"></Toast>
 </template>
 
 <script lang="ts" setup>
-import {ref} from 'vue'
+import {defineModel, ref} from 'vue'
+import Toast from "@/components/Toast.vue";
 import axios from 'axios'
 let host = window.location.hostname
 let port = window.location.port
-console.log(host)
 type Cell = { Id: number, Mines: number, IsMine: boolean, IsOpen: boolean, IsFlagged: boolean }
 type Result = {
   Cell: Cell[],
@@ -29,6 +30,9 @@ type Result = {
 }
 
 type Response = {
+  PlayerQuit: boolean
+  NewPlayer: boolean
+  UserId: string
   ChangeCell: Result
   TimeStamp: number
   StartTimeStamp: number
@@ -54,14 +58,15 @@ const minefield = ref<Minefield>({
   StartTimeStamp: 0,
 })
 
-const isWin = ref(false)
+const toast = ref<InstanceType<typeof Toast> | null>(null);
 const timeWatcher = ref('00:000')
 let startTimeStamp = 0
 document.oncontextmenu = () => false;
+const userId = localStorage.getItem('userId')??'john'
+const token = (localStorage.getItem('jwt')??'').replace('20240704','')
 
 const reConnect = () => {
-  const token = localStorage.getItem('jwt')
-  return new WebSocket(`ws://${host}:${port}/ws/101?token=${token}`);
+  return new WebSocket(`ws://${host}:${port}/ws/${userId}?token=${token}`);
 }
 const getBoard = async () => {
   let config = {
@@ -214,7 +219,7 @@ const getNearbyCells = (cell: number) => {
   let y = Math.floor(cell / width);
 
   let isNotFirstRow = y > 0; // 不在第一排
-  let isNotLastRow = y < height - 1; // 不咋最后一排
+  let isNotLastRow = y < height - 1; // 不在最后一排
 
 
   if (isNotFirstRow) nearbyCells.push(cell - width);      //up
@@ -249,16 +254,25 @@ function msToTime(duration: number): string {
 
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
+  if(toast.value ) {
+    if(data.NewPlayer){
+      toast.value.show(data.UserId + '加入了游戏！')
+    }
+    if(data.PlayerQuit) {
+      toast.value.show(data.UserId + '离开了游戏！')
+      return
+    }
+  }
   for (let i = 0; i < data.ChangeCell.Cell.length; i++) {
     minefield.value.Cell[data.ChangeCell.Cell[i].Id] = data.ChangeCell.Cell[i]
   }
   startTimeStamp = data.StartTimeStamp
   if (data.ChangeCell.Result.IsWin) {
-    let newGame = confirm(`你赢了！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`)
+    let newGame = confirm(`${decodeURIComponent(data.UserId)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`)
     if (newGame) {
       await getNewGame()
-      await getBoard()
     }
+    await getBoard()
   }
 }
 

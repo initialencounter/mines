@@ -33,7 +33,11 @@ func login(c *fiber.Ctx) error {
 	} else {
 		fmt.Println(user, pass)
 		// Throws Unauthorized error
-		if user != "john" || pass != "doe" {
+		exists := keyExists(&pool, user)
+		if exists {
+			return fiber.NewError(fiber.StatusForbidden, "User already exists:"+user)
+		}
+		if pass != "doe" {
 			return c.SendStatus(fiber.StatusUnauthorized)
 		}
 	}
@@ -54,4 +58,11 @@ func login(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{"token": t})
+}
+
+func keyExists(p *WebSocketPool, key string) bool {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	_, exists := p.connections[key]
+	return exists
 }

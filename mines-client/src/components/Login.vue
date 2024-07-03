@@ -13,7 +13,7 @@
       <div class="el-input__wrapper">
         <input v-model="shared.password"
                class="el-input__inner"
-               placeholder="密码"
+               placeholder="密码: doe"
                @keypress.enter.stop="login"></input>
         <svg class="k-icon" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg">
           <path
@@ -28,20 +28,18 @@
 
 <script lang="ts" setup>
 import {ElButton, ElMessage} from 'element-plus'
-import {ref, defineModel} from 'vue'
+import {defineModel, ref} from 'vue'
 import axios from "axios";
-import {useRouter} from "vue-router";
 
-const router = useRouter();
 let host = window.location.hostname
 let port = window.location.port
 
-const loggedIn = defineModel<boolean>({ required: true })
+const loggedIn = defineModel<boolean>({required: true})
 
 const shared = ref({
   showPass: false,
   userId: '',
-  password: '',
+  password: 'doe',
 })
 
 async function login() {
@@ -58,9 +56,12 @@ async function login() {
     const response = await axios(config);
     const token = response.data.token;
     loggedIn.value = true;
-    localStorage.setItem('jwt', token);
-  } catch (error) {
-    console.log(error)
+    localStorage.setItem('jwt', '20240704' + token);
+    localStorage.setItem('userId', userId);
+  } catch (error: any) {
+    if (error.message === 'Request failed with status code 403') {
+      alert('用户名已存在！！！')
+    }
     ElMessage.error({
       message: 'Invalid username or password',
       type: 'error',

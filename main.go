@@ -25,17 +25,17 @@ var distFiles embed.FS
 var assetFiles embed.FS
 
 type WebSocketPool struct {
-	connections map[*websocket.Conn]bool
+	connections map[string]*websocket.Conn
 	mu          sync.Mutex
 }
 
 var pool = WebSocketPool{
-	connections: make(map[*websocket.Conn]bool),
+	connections: make(map[string]*websocket.Conn),
 }
 
-const MINES = 99
-const WIDTH = 30
-const HEIGHT = 16
+const MINES = 600
+const WIDTH = 50
+const HEIGHT = 50
 
 func main() {
 	var m = newMinefield(MINES, WIDTH, HEIGHT)
@@ -122,10 +122,10 @@ func main() {
 			}
 			return
 		}
-
+		userId := c.Params("id")
 		// Add connection to the pool
 		pool.mu.Lock()
-		pool.connections[c] = true
+		pool.connections[userId] = c
 		pool.mu.Unlock()
 		log.Println("New WebSocket connection added")
 
@@ -133,6 +133,7 @@ func main() {
 			msg []byte
 		)
 		log.Println(c.Params("id"))
+		var newPlayer = true
 		for {
 			if _, msg, err = c.ReadMessage(); err != nil {
 				log.Println("read:", err)
@@ -143,8 +144,11 @@ func main() {
 				log.Println("Unmarshal error:", err)
 				continue
 			}
+
 			var response Response
 			result := m.openCells(message.Id)
+			response.NewPlayer = newPlayer
+			response.UserId = userId
 			response.ChangeCell = result
 			response.TimeStamp = message.TimeStamp
 			response.StartTimeStamp = m.StartTimeStamp
@@ -154,14 +158,22 @@ func main() {
 				fmt.Println(err)
 			}
 			pool.broadcastMessage(jsonData)
-			//log.Println("send:", string(jsonData))
+			newPlayer = false
 		}
 
 		// Remove connection from the pool
 		pool.mu.Lock()
-		delete(pool.connections, c)
+		delete(pool.connections, userId)
 		pool.mu.Unlock()
-		log.Println("WebSocket connection closed")
+		log.Println("WebSocket connection closed", userId)
+		var response Response
+		response.PlayerQuit = true
+		response.UserId = userId
+		jsonData, err := json.Marshal(response)
+		if err != nil {
+			fmt.Println(err)
+		}
+		pool.broadcastMessage(jsonData)
 		err = c.Close()
 		if err != nil {
 			return
@@ -174,14 +186,14 @@ func main() {
 func (p *WebSocketPool) broadcastMessage(message []byte) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	for conn := range p.connections {
+	for tag, conn := range p.connections {
 		if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
 			log.Printf("Error sending message: %v", err)
 			err := conn.Close()
 			if err != nil {
 				return
 			}
-			delete(p.connections, conn)
+			delete(p.connections, tag)
 		}
 	}
 }
