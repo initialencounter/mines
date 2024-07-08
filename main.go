@@ -33,12 +33,26 @@ var pool = WebSocketPool{
 	connections: make(map[string]*websocket.Conn),
 }
 
-const MINES = 600
-const WIDTH = 50
-const HEIGHT = 50
-
 func main() {
-	var m = newMinefield(MINES, WIDTH, HEIGHT)
+	var config = getConfig()
+
+	// 数据库连接
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Database.User, config.Database.Password, config.Database.Host, config.Database.Port, "mines")
+	fmt.Println(dsn)
+	handler, err := NewDBHandler(dsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer handler.Close()
+	// 确认连接有效
+	err = handler.db.Ping()
+	if err != nil {
+		log.Fatal(err)
+	}
+	handler.createTable()
+
+	// 扫雷地图初始化
+	var m = newMinefield(config.Mine.Mines, config.Mine.Width, config.Mine.Height)
 	app := fiber.New()
 
 	app.Use(cors.New(cors.Config{
@@ -56,10 +70,9 @@ func main() {
 		Root:       http.FS(assetFiles),
 		PathPrefix: "mines-client/src/assets",
 	}))
-	//app.Static("/", "./mines-client/dist")
-	//app.Static("/src/assets", "./mines-client/src/assets")
-	// Login route
-	app.Post("/login", login)
+
+	app.Post("/register", func(c *fiber.Ctx) error { return register(handler, c) })
+	app.Post("/login", func(c *fiber.Ctx) error { return login(handler, c) })
 	app.Post("/getMinefield", func(c *fiber.Ctx) error {
 		return c.JSON(m.openMinefield())
 	})
@@ -67,7 +80,7 @@ func main() {
 	app.Post("/newGame", func(c *fiber.Ctx) error {
 		stats := m.getStats(0)
 		if stats.IsWin {
-			m = newMinefield(MINES, WIDTH, HEIGHT)
+			m = newMinefield(config.Mine.Mines, config.Mine.Width, config.Mine.Height)
 			return c.JSON(fiber.Map{"result": "ok"})
 		} else {
 			return c.JSON(fiber.Map{"result": "fail"})
@@ -180,7 +193,7 @@ func main() {
 		}
 
 	}))
-	log.Fatal(app.Listen(":3000"))
+	log.Fatal(app.Listen(fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)))
 }
 
 func (p *WebSocketPool) broadcastMessage(message []byte) {

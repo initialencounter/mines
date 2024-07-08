@@ -8,7 +8,29 @@ import (
 	"time"
 )
 
-func login(c *fiber.Ctx) error {
+func register(handler *DBHandler, c *fiber.Ctx) error {
+	user := c.FormValue("user")
+	pass := c.FormValue("pass")
+	email := c.FormValue("email")
+
+	if user == "" || pass == "" || email == "" {
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	// Throws Unauthorized error
+	exists := keyExists(&pool, user)
+	if exists {
+		return fiber.NewError(fiber.StatusForbidden, "User already exists:"+user)
+	}
+
+	_, err := handler.db.Exec("INSERT INTO users (name, password, email) VALUES (?, ?, ?)", user, pass, email)
+	if err != nil {
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+	return c.SendStatus(fiber.StatusCreated)
+}
+
+func login(handler *DBHandler, c *fiber.Ctx) error {
 	user := c.FormValue("user")
 	pass := c.FormValue("pass")
 

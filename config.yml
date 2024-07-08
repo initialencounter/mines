@@ -1,0 +1,16 @@
+
+app:
+  name: "MineSweeper Server"
+  version: "1.0.0"
+server:
+  port: 8080
+  host: "localhost"
+mine:
+  width: 50
+  height: 50
+  mines: 600
+database:
+  host: "localhost"
+  port: 3306
+  user: "root"
+  password: "mines"
