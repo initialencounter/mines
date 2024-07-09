@@ -8,31 +8,51 @@ import (
 	"time"
 )
 
+type RegisterRequest struct {
+	User  string `json:"user"`
+	Pass  string `json:"pass"`
+	Email string `json:"email"`
+}
+
+type LoginRequest struct {
+	User string `json:"user"`
+	Pass string `json:"pass"`
+}
+
 func register(handler *DBHandler, c *fiber.Ctx) error {
-	user := c.FormValue("user")
-	pass := c.FormValue("pass")
-	email := c.FormValue("email")
+	var req RegisterRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
+	}
+
+	user := req.User
+	pass := req.Pass
+	email := req.Email
 
 	if user == "" || pass == "" || email == "" {
-		return c.SendStatus(fiber.StatusBadRequest)
+		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body not enough data")
 	}
-
-	// Throws Unauthorized error
-	exists := keyExists(&pool, user)
-	if exists {
-		return fiber.NewError(fiber.StatusForbidden, "User already exists:"+user)
+	if handler.nameExists(user) {
+		return fiber.NewError(fiber.StatusConflict, "User already exists")
 	}
-
+	fmt.Println(user, pass, email)
 	_, err := handler.db.Exec("INSERT INTO users (name, password, email) VALUES (?, ?, ?)", user, pass, email)
 	if err != nil {
+		fmt.Println(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
+	fmt.Println("11111111111111")
 	return c.SendStatus(fiber.StatusCreated)
 }
 
 func login(handler *DBHandler, c *fiber.Ctx) error {
-	user := c.FormValue("user")
-	pass := c.FormValue("pass")
+	var req LoginRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
+	}
+
+	user := req.User
+	pass := req.Pass
 
 	if user == "" || pass == "" {
 		tokenString := c.Query("token")
@@ -53,20 +73,18 @@ func login(handler *DBHandler, c *fiber.Ctx) error {
 			return c.SendStatus(fiber.StatusUnauthorized)
 		}
 	} else {
-		fmt.Println(user, pass)
-		// Throws Unauthorized error
-		exists := keyExists(&pool, user)
-		if exists {
-			return fiber.NewError(fiber.StatusForbidden, "User already exists:"+user)
+		if !handler.nameExists(user) {
+			return fiber.NewError(fiber.StatusUnauthorized, "User not found or Password does not match")
 		}
-		if pass != "doe" {
-			return c.SendStatus(fiber.StatusUnauthorized)
+		if !handler.passwordMatch(user, pass) {
+			return fiber.NewError(fiber.StatusUnauthorized, "User not found or Password does not match")
 		}
+		fmt.Println(user)
 	}
 	// Create the Claims
 	claims := jwt.MapClaims{
-		"name":  "John Doe",
-		"admin": true,
+		"name":  user,
+		"admin": false,
 		"exp":   time.Now().Add(time.Hour * 72).Unix(),
 	}
 

@@ -1,31 +1,21 @@
 <script lang="ts" setup>
-import {ref} from 'vue'
-import Board from './components/Board.vue'
-import Login from './components/Login.vue'
+import Login from '@/components/Login.vue';
+import Board from '@/components/Board.vue';
+import {ref} from "vue";
 
-const loggedIn = ref<boolean>(false)
-loggedIn.value = (localStorage.getItem('jwt'))?.startsWith('20240704') ?? false;
+const jwt = localStorage.getItem('jwt')?.replace('20240704', '')
+
+const isExpired = (jwt: string | undefined) => {
+  if (!jwt) return true
+  const payload = JSON.parse(atob(jwt.split('.')[1]))
+  if (payload.exp === undefined) return true
+  return Date.now() > payload.exp * 1000
+}
+
+const showLogin = ref<boolean>(isExpired(jwt))
 
 </script>
-
 <template>
-  <main class="container">
-    <Board v-if="loggedIn"></Board>
-    <Login v-if="!loggedIn" v-model="loggedIn" class="board"></Login>
-  </main>
+  <Board v-if="!showLogin" v-model="showLogin"></Board>
+  <Login v-if="showLogin" v-model="showLogin"></Login>
 </template>
-
-<style scoped>
-.container {
-  position: relative;
-  place-items: center; /* 垂直居中 */
-  height: 100vh; /* 父容器高度设为视口高度 */
-}
-
-.board {
-  position: absolute;
-  top: 20%;
-  left: 20%;
-  transform: translate(-50%, -50%); /* 通过 transform 平移实现居中 */
-}
-</style>

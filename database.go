@@ -194,6 +194,16 @@ func (handler *DBHandler) nameExists(name string) bool {
 	return count > 0
 }
 
+func (handler *DBHandler) passwordMatch(name string, password string) bool {
+	query := "SELECT COUNT(*) FROM users WHERE name = ? AND password = ?"
+	var count int
+	err := handler.db.QueryRow(query, name, password).Scan(&count)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return count > 0
+}
+
 // Close 关闭数据库连接
 func (handler *DBHandler) Close() {
 	err := handler.db.Close()

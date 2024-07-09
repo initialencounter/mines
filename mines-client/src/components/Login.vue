@@ -1,49 +1,153 @@
 <template>
-  <div class="login-form">
-    <template v-if="true">
-      <div class="el-input__wrapper">
-        <input v-model="shared.userId" class="el-input__inner" placeholder="用户名">
-        <svg class="k-icon" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg">
-          <path
-              d="M224 256c70.7 0 128-57.3 128-128S294.7 0 224 0 96 57.3 96 128s57.3 128 128 128zm89.6 32h-16.7c-22.2 10.2-46.9 16-72.9 16s-50.6-5.8-72.9-16h-16.7C60.2 288 0 348.2 0 422.4V464c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48v-41.6c0-74.2-60.2-134.4-134.4-134.4z"
-              fill="currentColor"></path>
-        </svg>
-      </div>
-
-      <div class="el-input__wrapper">
-        <input v-model="shared.password"
-               class="el-input__inner"
-               placeholder="密码: doe"
-               @keypress.enter.stop="login">
-        <svg class="k-icon" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg">
-          <path
-              d="M400 224h-24v-72C376 68.2 307.8 0 224 0S72 68.2 72 152v72H48c-26.5 0-48 21.5-48 48v192c0 26.5 21.5 48 48 48h352c26.5 0 48-21.5 48-48V272c0-26.5-21.5-48-48-48zm-104 0H152v-72c0-39.7 32.3-72 72-72s72 32.3 72 72v72z"
-              fill="currentColor"></path>
-        </svg>
-      </div>
-      <ElButton class="ElButton" @click="login">登录</ElButton>
-    </template>
+  <div class="common-layout">
+    <el-container>
+      <el-header></el-header>
+      <el-main>
+        <el-form v-if="!registerMode" ref="ruleFormRef"
+                 v-loading="loading"
+                 :model="ruleForm"
+                 :rules="rules"
+                 :size="formSize"
+                 class="demo-ruleForm"
+                 label-width="auto"
+                 status-icon
+                 style="max-width: 500px"
+        >
+          <el-form-item>
+            <h1>亲，请登录</h1>
+          </el-form-item>
+          <el-form-item label="用户名" prop="userId">
+            <el-input v-model="ruleForm.userId"/>
+          </el-form-item>
+          <el-form-item label="密码" prop="password">
+            <el-input v-model="ruleForm.password" type="password"/>
+          </el-form-item>
+          <el-form-item>
+            <div class="config-button">
+              <el-button type="primary" @click="submitForm(ruleFormRef)">登录</el-button>
+              <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
+              <el-button type="info">忘记密码</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item>
+            <div class="config-button">
+              <el-button type="primary" @click="switchMode">没有账号！点我注册！</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+        <el-form v-if="registerMode" ref="ruleFormRef"
+                 v-loading="loading"
+                 :model="ruleForm"
+                 :rules="rules"
+                 :size="formSize"
+                 class="demo-ruleForm"
+                 label-width="auto"
+                 status-icon
+                 style="max-width: 500px"
+        >
+          <el-form-item>
+            <h1>注册模式</h1>
+          </el-form-item>
+          <el-form-item label="用户名" prop="userId">
+            <el-input v-model="ruleForm.userId"/>
+          </el-form-item>
+          <el-form-item label="密码" prop="password">
+            <el-input v-model="ruleForm.password" type="password"/>
+          </el-form-item>
+          <el-form-item label="确认密码" prop="checkPass">
+            <el-input v-model="ruleForm.checkPass" type="password"/>
+          </el-form-item>
+          <el-form-item label="email" prop="email">
+            <el-input v-model="ruleForm.email"/>
+          </el-form-item>
+          <el-form-item>
+            <div class="config-button">
+              <el-button type="primary" @click="submitForm(ruleFormRef)">注册</el-button>
+              <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
+            </div>
+          </el-form-item>
+          <el-form-item>
+            <div class="config-button">
+              <el-button type="primary" @click="login">已有账号！点我登录！</el-button>
+            </div>
+          </el-form-item>
+        </el-form>
+      </el-main>
+      <el-footer></el-footer>
+    </el-container>
   </div>
 </template>
 
+
 <script lang="ts" setup>
-import {ElButton, ElMessage} from 'element-plus'
-import {defineModel, ref} from 'vue'
+import {reactive, ref} from 'vue'
 import axios from "axios";
+import {host, port} from "@/utils";
 
-let host = window.location.hostname
-let port = window.location.port
+import {type ComponentSize, ElMessage, ElNotification, type FormInstance, type FormRules} from 'element-plus'
 
-const loggedIn = defineModel<boolean>({required: true})
+const registerMode = ref(false)
+const loading = ref(false)
+const showLogin = defineModel<boolean>({required: true})
 
-const shared = ref({
-  showPass: false,
+interface RuleForm {
+  userId: string
+  password: string
+  checkPass: string
+  email: string
+}
+
+const formSize = ref<ComponentSize>('default')
+const ruleFormRef = ref<FormInstance>()
+const ruleForm = reactive<RuleForm>({
   userId: '',
-  password: 'doe',
+  password: '',
+  checkPass: '',
+  email: '',
 })
 
+const rules = reactive<FormRules<RuleForm>>({
+  userId: [
+    {required: true, message: '请输入用户名！', trigger: 'blur'},
+    {min: 3, max: 16, message: '长度应该为 3 - 16', trigger: 'blur'},
+  ],
+  password: [
+    {required: true, message: '请输入密码！', trigger: 'blur'},
+    {min: 1, max: 16, message: '长度应该为 1 - 16', trigger: 'blur'},
+  ],
+  checkPass: [
+    {required: true, message: '请输入再次密码！', trigger: 'blur'},
+    {min: 1, max: 16, message: '长度应该为 1 - 16', trigger: 'blur'},
+  ],
+  email: [
+    {required: true, message: '请输入邮箱！', trigger: 'blur'},
+    {min: 5, max: 16, message: '长度应该为 5 - 16', trigger: 'blur'},
+  ],
+})
+
+const submitForm = async (formEl: FormInstance | undefined) => {
+  if (!formEl) return
+  await formEl.validate((valid, fields) => {
+    if (valid) {
+      if (registerMode.value)
+        register()
+      else {
+        login()
+      }
+    } else {
+      ElMessage.error('error submit!')
+    }
+  })
+}
+
+const resetForm = (formEl: FormInstance | undefined) => {
+  if (!formEl) return
+  formEl.resetFields()
+}
+
 async function login() {
-  const {userId, password} = shared.value
+  loading.value = true
+  const {userId, password} = ruleForm
   try {
     let config = {
       method: 'post',
@@ -54,110 +158,90 @@ async function login() {
       }
     };
     const response = await axios(config);
+    loading.value = false
+    ElMessage({
+      message: `${userId}，欢迎回来！`,
+      type: 'success',
+      plain: true,
+    })
+    showLogin.value = false
     const token = response.data.token;
-    loggedIn.value = true;
     localStorage.setItem('jwt', '20240704' + token);
     localStorage.setItem('userId', userId);
   } catch (error: any) {
-    if (error.message === 'Request failed with status code 403') {
-      alert('用户名已存在！！！')
-    }
-    ElMessage.error({
-      message: 'Invalid username or password',
+    loading.value = false
+    ElNotification({
+      title: 'Error',
+      message: error.response.data,
       type: 'error',
-      customClass: 'customClass',
-      offset: 100
-    });
+      duration: 0,
+    })
   }
 }
 
+const register = () => {
+  loading.value = true
+  const {userId, password, email} = ruleForm
+  if (password !== ruleForm.checkPass) {
+    ElMessage.error('两次密码不一致！')
+    return
+  }
+  try {
+    let config = {
+      method: 'post',
+      url: `http://${host}:${port}/register`,
+      headers: {
+        'Content-Type': 'application/xml',
+        'Accept': '*/*',
+      },
+      data: {
+        user: userId,
+        pass: password,
+        email: email
+      }
+    };
+    const response = axios(config);
+    loading.value = false
+    ElMessage({
+      message: `${userId}，欢迎加入！`,
+      type: 'success',
+      plain: true,
+    })
+    showLogin.value = false
+    const token = response.data.token;
+    localStorage.setItem('jwt', '20240704' + token);
+    localStorage.setItem('userId', userId);
+  } catch (error: any) {
+    loading.value = false
+    ElNotification({
+      title: 'Error',
+      message: error.response.data,
+      type: 'error',
+      duration: 0,
+    })
+  }
+}
+const switchMode = () => {
+  registerMode.value = !registerMode.value
+}
 </script>
 
 <style>
 
-.login-form {
-  width: 20rem;
-  height: 12rem;
-  border-radius: 5px;
-  border: lightgrey 1px solid;
-  justify-content: center;
-  align-items: center;
-  display: block;
+.el-form {
+  background: rgba(121, 187, 255, 0.18);
+  padding: 5rem;
+  margin: 5rem;
+  border-radius: 0.8rem;
 }
 
-h1 {
-  font-size: 1.5rem;
-  margin: 2.5rem auto;
-  cursor: default;
+.el-item {
+  margin: 1rem;
 }
 
-.el-input__wrapper {
-  top: 2rem;
-  position: relative;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  border-radius: 5px;
-}
-
-.el-input__inner {
-  position: relative;
-  display: block;
-  margin: 0.5rem;
-  height: 2rem;
-  width: 8rem;
+.config-button {
   left: 20%;
-  --el-input-inner-height: calc(var(--el-input-height, 32px) - 2px);
-  flex-grow: 1;
-  color: var(--el-input-text-color, var(--el-text-color-regular));
-  font-size: inherit;
-  line-height: var(--el-input-inner-height);
-  padding: 0;
-  outline: 0;
-  border: none;
-  background: 0 0;
-  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
 }
-
-.el-input__wrapper:hover {
-  border: #b1b1b1 2px solid;
-  border-radius: 5px;
-}
-
-
-.k-icon {
-  position: absolute;
-  left: 2rem;
-  top: 1rem;
-  margin: 0.5rem;
-  transform: translateY(-50%);
-  height: 1.2rem;
-  color: var(--el-input-placeholder-color);
-}
-
-.ElButton {
-  position: absolute;
-  top: 75%;
-  left: 40%;
-  font-size: 14px;
-  font-weight: bolder;
-  line-height: 20px;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  -webkit-user-select: none;
-  user-select: none;
-  border-radius: .4em;
-  cursor: pointer;
-  padding: .4em 1em;
-  display: inline-block;
-  background: #595959;
-}
-
-.ElButton:hover {
-  background-color: rgba(151, 150, 150, 0.23);
-}
-
-
-
 </style>

@@ -8,15 +8,16 @@
          @mousedown="(event) => handleClick(event,index)">
     </div>
   </div>
+  <ElButton class="logout-button" @click="logout">退出登录</ElButton>
   <Toast ref="toast"></Toast>
 </template>
 
 <script lang="ts" setup>
-import { ref } from 'vue'
+import {ref} from 'vue'
 import Toast from "@/components/Toast.vue";
 import axios from 'axios'
-let host = window.location.hostname
-let port = window.location.port
+import {host, port} from "@/utils";
+
 type Cell = { Id: number, Mines: number, IsMine: boolean, IsOpen: boolean, IsFlagged: boolean }
 type Result = {
   Cell: Cell[],
@@ -59,11 +60,12 @@ const minefield = ref<Minefield>({
 })
 
 const toast = ref<InstanceType<typeof Toast> | null>(null);
+const showLogin = defineModel<boolean>({required: true})
 const timeWatcher = ref('00:000')
 let startTimeStamp = 0
 document.oncontextmenu = () => false;
-const userId = localStorage.getItem('userId')??'john'
-const token = (localStorage.getItem('jwt')??'').replace('20240704','')
+const userId = localStorage.getItem('userId') ?? 'john'
+const token = (localStorage.getItem('jwt') ?? '').replace('20240704', '')
 
 const reConnect = () => {
   return new WebSocket(`ws://${host}:${port}/ws/${userId}?token=${token}`);
@@ -254,11 +256,11 @@ function msToTime(duration: number): string {
 
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
-  if(toast.value ) {
-    if(data.NewPlayer){
+  if (toast.value) {
+    if (data.NewPlayer) {
       toast.value.show(data.UserId + '加入了游戏！')
     }
-    if(data.PlayerQuit) {
+    if (data.PlayerQuit) {
       toast.value.show(data.UserId + '离开了游戏！')
       return
     }
@@ -274,6 +276,13 @@ ws.onmessage = async (event) => {
     }
     await getBoard()
   }
+}
+
+function logout() {
+  localStorage.removeItem('jwt');
+  localStorage.removeItem('userId');
+  // Redirect to login page or refresh the page
+  showLogin.value = true;
 }
 
 </script>
@@ -311,5 +320,12 @@ ws.onmessage = async (event) => {
 .cell:hover {
   background-color: gray;
   color: white;
+}
+
+.logout-button {
+  position: absolute;
+  top: 20px; /* Adjust as needed */
+  right: 20px; /* Adjust as needed */
+  z-index: 100; /* Ensure it's above other content */
 }
 </style>
