@@ -16,6 +16,15 @@ const showLogin = ref<boolean>(isExpired(jwt))
 
 </script>
 <template>
-  <Board v-if="!showLogin" v-model="showLogin"></Board>
-  <Login v-if="showLogin" v-model="showLogin"></Login>
+  <div class="common-layout">
+    <el-container>
+      <el-header></el-header>
+      <el-main>
+        <Board v-if="!showLogin" v-model="showLogin"></Board>
+        <Login v-if="showLogin" v-model="showLogin"></Login>
+      </el-main>
+      <el-footer></el-footer>
+    </el-container>
+  </div>
+
 </template>

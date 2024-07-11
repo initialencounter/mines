@@ -127,7 +127,7 @@ const rules = reactive<FormRules<RuleForm>>({
 
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
-  await formEl.validate((valid, fields) => {
+  await formEl.validate((valid) => {
     if (valid) {
       if (registerMode.value)
         register()
@@ -151,10 +151,14 @@ async function login() {
   try {
     let config = {
       method: 'post',
-      url: `http://${host}:${port}/login?user=${userId}&pass=${password}`,
+      url: `http://${host}:${port}/login`,
       headers: {
         'Content-Type': 'application/json',
         'Accept': '*/*',
+      },
+      data: {
+        user: userId,
+        pass: password,
       }
     };
     const response = await axios(config);
@@ -167,7 +171,7 @@ async function login() {
     showLogin.value = false
     const token = response.data.token;
     localStorage.setItem('jwt', '20240704' + token);
-    localStorage.setItem('userId', userId);
+    localStorage.setItem('userId', response.data.id);
   } catch (error: any) {
     loading.value = false
     ElNotification({
@@ -210,7 +214,7 @@ const register = async () => {
     showLogin.value = false
     const token = response.data.token;
     localStorage.setItem('jwt', '20240704' + token);
-    localStorage.setItem('userId', userId);
+    localStorage.setItem('userId', response.data.id);
   } catch (error: any) {
     loading.value = false
     ElNotification({

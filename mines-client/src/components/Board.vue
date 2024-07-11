@@ -1,54 +1,26 @@
 <template>
-  <div class="board">
-    <div class="timeWatcher">{{ timeWatcher }}</div>
+  <div class="timeWatcher">{{ timeWatcher }}</div>
+  <el-button class="logout-button" @click="logout">退出登录</el-button>
+  <div class="board" :style="{
+    gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
+    gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`
+  }">
     <div v-for="(cell, index) in minefield.Cell" :key="index"
-         :style="{position: 'absolute', top: Math.floor(index/minefield.Width)*94+'px', left: (index%minefield.Width)*94+'px',
-         backgroundImage: `url(${getImageSrc(cell)})`}"
+         :style="{backgroundImage: `url(${getImageSrc(cell)})`}"
          class="cell"
          @mousedown="(event) => handleClick(event,index)">
     </div>
   </div>
-  <ElButton class="logout-button" @click="logout">退出登录</ElButton>
-  <Toast ref="toast"></Toast>
 </template>
 
 <script lang="ts" setup>
-import {ref} from 'vue'
-import Toast from "@/components/Toast.vue";
+import {h, ref} from 'vue'
 import axios from 'axios'
 import {host, port} from "@/utils";
+import {ElMessage, ElMessageBox, ElNotification} from "element-plus";
+import type {Cell, Minefield, Response} from "@/types";
 
-type Cell = { Id: number, Mines: number, IsMine: boolean, IsOpen: boolean, IsFlagged: boolean }
-type Result = {
-  Cell: Cell[],
-  Result: {
-    IsWin: boolean,
-    IsBoom: boolean,
-    RemainCells: boolean,
-    Message: string,
-    TimeStamp: number,
-  },
-}
-
-type Response = {
-  PlayerQuit: boolean
-  NewPlayer: boolean
-  UserId: string
-  ChangeCell: Result
-  TimeStamp: number
-  StartTimeStamp: number
-}
-
-type Minefield = {
-  Width: number
-  Height: number
-  Cells: number
-  Mines: number
-  Cell: Cell[]
-  First: boolean
-  StartTimeStamp: number
-}
-
+const cellSize = 24
 const minefield = ref<Minefield>({
   Width: 5,
   Height: 4,
@@ -59,12 +31,11 @@ const minefield = ref<Minefield>({
   StartTimeStamp: 0,
 })
 
-const toast = ref<InstanceType<typeof Toast> | null>(null);
 const showLogin = defineModel<boolean>({required: true})
 const timeWatcher = ref('00:000')
 let startTimeStamp = 0
 document.oncontextmenu = () => false;
-const userId = localStorage.getItem('userId') ?? 'john'
+const userId = localStorage.getItem('userId')
 const token = (localStorage.getItem('jwt') ?? '').replace('20240704', '')
 
 const reConnect = () => {
@@ -79,9 +50,7 @@ const getBoard = async () => {
       'Accept': '*/*',
     }
   };
-  let board = (await axios(config)).data
-  console.log(board)
-  minefield.value = board
+  minefield.value = (await axios(config)).data
 }
 
 const getNewGame = async () => {
@@ -180,11 +149,12 @@ const doOpen = (index: number, now: number) => {
 }
 
 let timer = false
+let intervalFlag: number
 const handleClick = (event: MouseEvent, index: number) => {
   let now = new Date().getTime()
   if (!timer) {
     timer = true
-    setInterval(() => {
+    intervalFlag = setInterval(() => {
       let now1 = new Date().getTime()
       timeWatcher.value = msToTime(now1 - startTimeStamp)
     }, 1)
@@ -256,25 +226,48 @@ function msToTime(duration: number): string {
 
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
-  if (toast.value) {
     if (data.NewPlayer) {
-      toast.value.show(data.UserId + '加入了游戏！')
+      ElNotification({
+        title: 'Success',
+        message: h('i', { style: 'color: teal' }, data.UserId + ' 加入了游戏！'),
+      })
     }
     if (data.PlayerQuit) {
-      toast.value.show(data.UserId + '离开了游戏！')
+      ElNotification({
+        title: 'Success',
+        message: h('i', { style: 'color: teal' }, data.UserId + ' 离开了游戏！'),
+      })
       return
     }
-  }
   for (let i = 0; i < data.ChangeCell.Cell.length; i++) {
     minefield.value.Cell[data.ChangeCell.Cell[i].Id] = data.ChangeCell.Cell[i]
   }
   startTimeStamp = data.StartTimeStamp
   if (data.ChangeCell.Result.IsWin) {
-    let newGame = confirm(`${decodeURIComponent(data.UserId)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`)
-    if (newGame) {
-      await getNewGame()
+    if(timer){
+      clearInterval(intervalFlag)
+      timer = false
     }
-    await getBoard()
+    ElMessageBox.confirm(
+        `${decodeURIComponent(data.UserId)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`,
+        'Success',
+        {
+          confirmButtonText: 'OK',
+          cancelButtonText: 'Cancel',
+          type: 'success',
+        }
+    )
+        .then(async () => {
+          await getNewGame()
+          await getBoard()
+        })
+        .catch(() => {
+          ElMessage({
+            type: 'info',
+            message: '取消了再来一局！',
+          })
+        })
+
   }
 }
 
@@ -289,37 +282,28 @@ function logout() {
 
 <style scoped>
 .board {
-  position: relative;
-  left: 10px;
-  top: 10px;
-}
-
-.timeWatcher {
+  display: grid;
   position: absolute;
-  top: -100px;
-  left: 20px;
-  font-size: 48px;
-  font-weight: bold;
-  color: #00bd7e;
+  top: 80px;
+  left: 50px;
 }
 
 .cell {
-  position: absolute;
-  height: 94px;
-  width: 94px;
-  justify-content: center;
-  align-items: center;
-  background-color: lightgray;
-  border: 1px solid gray;
-  cursor: pointer;
-  font-size: 18px;
-  font-weight: bold;
-  user-select: none;
+  background-size: cover;
 }
 
 .cell:hover {
   background-color: gray;
   color: white;
+}
+
+.timeWatcher {
+  position: absolute;
+  top: 20px; /* Adjust as needed */
+  left: 20px;
+  font-size: 26px;
+  font-weight: bold;
+  color: #00bd7e;
 }
 
 .logout-button {
