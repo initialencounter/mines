@@ -153,7 +153,7 @@ async function login() {
       method: 'post',
       url: `http://${host}:${port}/login?user=${userId}&pass=${password}`,
       headers: {
-        'Content-Type': 'application/xml',
+        'Content-Type': 'application/json',
         'Accept': '*/*',
       }
     };
@@ -179,7 +179,7 @@ async function login() {
   }
 }
 
-const register = () => {
+const register = async () => {
   loading.value = true
   const {userId, password, email} = ruleForm
   if (password !== ruleForm.checkPass) {
@@ -191,7 +191,7 @@ const register = () => {
       method: 'post',
       url: `http://${host}:${port}/register`,
       headers: {
-        'Content-Type': 'application/xml',
+        'Content-Type': 'application/json',
         'Accept': '*/*',
       },
       data: {
@@ -200,7 +200,7 @@ const register = () => {
         email: email
       }
     };
-    const response = axios(config);
+    const response = await axios(config);
     loading.value = false
     ElMessage({
       message: `${userId}，欢迎加入！`,
