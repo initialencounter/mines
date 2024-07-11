@@ -10,8 +10,11 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/filesystem"
 	"github.com/golang-jwt/jwt/v5"
 	"log"
+	"main/database"
+	"main/fiberHandle"
+	"main/utils"
 	"net/http"
-	"sync"
+	"strconv"
 )
 
 // 嵌入 mines-client/dist 目录中的所有文件
@@ -24,14 +27,8 @@ var distFiles embed.FS
 //go:embed mines-client/src/assets/*
 var assetFiles embed.FS
 
-type WebSocketPool struct {
-	connections map[string]*websocket.Conn
-	mu          sync.Mutex
-}
-
-var pool = WebSocketPool{
-	connections: make(map[string]*websocket.Conn),
-}
+var pool = utils.NewWebSocketPool()
+var nameCache = utils.NewNameCache()
 
 func main() {
 	var config = getConfig()
@@ -39,17 +36,17 @@ func main() {
 	// 数据库连接
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Database.User, config.Database.Password, config.Database.Host, config.Database.Port, "mines")
 	fmt.Println(dsn)
-	handler, err := NewDBHandler(dsn)
+	handler, err := database.NewDBHandler(dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer handler.Close()
 	// 确认连接有效
-	err = handler.db.Ping()
+	err = handler.Db.Ping()
 	if err != nil {
 		log.Fatal(err)
 	}
-	handler.createTable()
+	handler.CreateTable()
 
 	// 扫雷地图初始化
 	var m = newMinefield(config.Mine.Mines, config.Mine.Width, config.Mine.Height)
@@ -71,8 +68,8 @@ func main() {
 		PathPrefix: "mines-client/src/assets",
 	}))
 
-	app.Post("/register", func(c *fiber.Ctx) error { return register(handler, c) })
-	app.Post("/login", func(c *fiber.Ctx) error { return login(handler, c) })
+	app.Post("/register", func(c *fiber.Ctx) error { return fiberHandle.Register(handler, c) })
+	app.Post("/login", func(c *fiber.Ctx) error { return fiberHandle.Login(handler, c) })
 	app.Post("/getMinefield", func(c *fiber.Ctx) error {
 		return c.JSON(m.openMinefield())
 	})
@@ -136,10 +133,15 @@ func main() {
 			return
 		}
 		userId := c.Params("id")
+		id, err := strconv.Atoi(userId)
+		if err != nil {
+			err := c.WriteMessage(websocket.TextMessage, []byte("invalid id"))
+			if err != nil {
+				return
+			}
+		}
 		// Add connection to the pool
-		pool.mu.Lock()
-		pool.connections[userId] = c
-		pool.mu.Unlock()
+		pool.Set(id, c)
 		log.Println("New WebSocket connection added")
 
 		var (
@@ -157,11 +159,21 @@ func main() {
 				log.Println("Unmarshal error:", err)
 				continue
 			}
-
+			if newPlayer {
+				userName, err := handler.GetName(id)
+				if err != nil {
+					break
+				}
+				nameCache.Set(id, userName)
+			}
 			var response Response
 			result := m.openCells(message.Id)
 			response.NewPlayer = newPlayer
-			response.UserId = userId
+			if name, ok := nameCache.Get(id); ok {
+				response.UserId = name
+			} else {
+				response.UserId = ""
+			}
 			response.ChangeCell = result
 			response.TimeStamp = message.TimeStamp
 			response.StartTimeStamp = m.StartTimeStamp
@@ -170,14 +182,13 @@ func main() {
 			if err != nil {
 				fmt.Println(err)
 			}
-			pool.broadcastMessage(jsonData)
+			pool.BroadcastMessage(jsonData)
 			newPlayer = false
 		}
 
 		// Remove connection from the pool
-		pool.mu.Lock()
-		delete(pool.connections, userId)
-		pool.mu.Unlock()
+		pool.Delete(id)
+		nameCache.Delete(id)
 		log.Println("WebSocket connection closed", userId)
 		var response Response
 		response.PlayerQuit = true
@@ -186,7 +197,7 @@ func main() {
 		if err != nil {
 			fmt.Println(err)
 		}
-		pool.broadcastMessage(jsonData)
+		pool.BroadcastMessage(jsonData)
 		err = c.Close()
 		if err != nil {
 			return
@@ -194,19 +205,4 @@ func main() {
 
 	}))
 	log.Fatal(app.Listen(fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)))
-}
-
-func (p *WebSocketPool) broadcastMessage(message []byte) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	for tag, conn := range p.connections {
-		if err := conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			log.Printf("Error sending message: %v", err)
-			err := conn.Close()
-			if err != nil {
-				return
-			}
-			delete(p.connections, tag)
-		}
-	}
 }

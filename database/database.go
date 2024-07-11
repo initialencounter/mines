@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 
 // DBHandler 是一个封装了数据库操作的结构体
 type DBHandler struct {
-	db *sql.DB
+	Db *sql.DB
 }
 
 // NewDBHandler 创建一个新的 DBHandler 实例
@@ -24,7 +24,7 @@ func NewDBHandler(dsn string) (*DBHandler, error) {
 		return nil, err
 	}
 
-	return &DBHandler{db: db}, nil
+	return &DBHandler{Db: db}, nil
 }
 
 func test() {
@@ -47,7 +47,7 @@ func test() {
 	}
 }
 
-func (handler *DBHandler) createTable() {
+func (handler *DBHandler) CreateTable() {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
 		id INT AUTO_INCREMENT,
@@ -57,41 +57,43 @@ func (handler *DBHandler) createTable() {
 		medal INT NOT NULL DEFAULT 0,
 		PRIMARY KEY (id)
 	);`
-	_, err := handler.db.Exec(query)
+	_, err := handler.Db.Exec(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Table created or already exists.")
 }
 
-func (handler *DBHandler) insertRecord(name string, password string, email string, medal int) {
+func (handler *DBHandler) InsertRecord(name string, password string, email string, medal int) error {
 	query := "INSERT INTO users (name, password, email, medal) VALUES (?, ?, ?, ?)"
-	_, err := handler.db.Exec(query, name, password, email, medal)
+	_, err := handler.Db.Exec(query, name, password, email, medal)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Inserted record:", name, password, email, medal)
+	return err
 }
-func (handler *DBHandler) addColumn() {
+func (handler *DBHandler) AddColumn() error {
 	query := "ALTER TABLE users ADD COLUMN qq VARCHAR(100);"
-	_, err := handler.db.Exec(query)
+	_, err := handler.Db.Exec(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Added new column 'qq' to table 'users'.")
+	return err
 }
-func (handler *DBHandler) dropColumn() {
+func (handler *DBHandler) DropColumn() error {
 	query := "ALTER TABLE users DROP COLUMN email;"
-	_, err := handler.db.Exec(query)
+	_, err := handler.Db.Exec(query)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Dropped column 'qq' from table 'users'.")
+	return err
 }
 
-func (handler *DBHandler) queryRecords() {
+func (handler *DBHandler) QueryRecords() error {
 	query := "SELECT id, name, password, medal FROM users"
-	rows, err := handler.db.Query(query)
+	rows, err := handler.Db.Query(query)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -118,18 +120,21 @@ func (handler *DBHandler) queryRecords() {
 	if err := rows.Err(); err != nil {
 		log.Fatal(err)
 	}
+	return err
 }
 
-func (handler *DBHandler) updateMedal(id int, newMedal int) {
+func (handler *DBHandler) UpdateMedal(id int, newMedal int) error {
 	query := "UPDATE users SET medal = ? WHERE id = ?"
-	_, err := handler.db.Exec(query, newMedal, id)
+	_, err := handler.Db.Exec(query, newMedal, id)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Updated record id %d with new age %d\n", id, newMedal)
+	return err
+
 }
 
-func (handler *DBHandler) incrementAttr(id int, attr string) {
+func (handler *DBHandler) IncrementAttr(id int, attr string) error {
 	allowedAttrs := map[string]bool{
 		"medal": true,
 	}
@@ -137,18 +142,19 @@ func (handler *DBHandler) incrementAttr(id int, attr string) {
 	// Check if the attr is allowed
 	if !allowedAttrs[attr] {
 		log.Fatalf("Invalid attribute: %s", attr)
-		return
+		return nil
 	}
 	// language=ignore
 	query := fmt.Sprintf("UPDATE users SET %s = %s + 1 WHERE id = ?", attr, attr)
-	_, err := handler.db.Exec(query, id)
+	_, err := handler.Db.Exec(query, id)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Incremented %s for record id %d\n", attr, id)
+	return err
 }
 
-func (handler *DBHandler) decrementAttr(id int, attr string) {
+func (handler *DBHandler) DecrementAttr(id int, attr string) error {
 	allowedAttrs := map[string]bool{
 		"medal": true,
 	}
@@ -156,57 +162,74 @@ func (handler *DBHandler) decrementAttr(id int, attr string) {
 	// Check if the attr is allowed
 	if !allowedAttrs[attr] {
 		log.Fatalf("Invalid attribute: %s", attr)
-		return
+		return nil
 	}
 	query := "UPDATE users SET ? = ? - 1 WHERE id = ?"
-	_, err := handler.db.Exec(query, attr, attr, id)
+	_, err := handler.Db.Exec(query, attr, attr, id)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Decremented medal for record id %d\n", id)
+	return err
 }
 
-func (handler *DBHandler) deleteRecord(id int) {
+func (handler *DBHandler) DeleteRecord(id int) error {
 	query := "DELETE FROM users WHERE id = ?"
-	_, err := handler.db.Exec(query, id)
+	_, err := handler.Db.Exec(query, id)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Deleted record id %d\n", id)
+	return err
 }
 
-func (handler *DBHandler) changePassword(id int, newPassword string) {
+func (handler *DBHandler) ChangePassword(id int, newPassword string) error {
 	query := "UPDATE users SET password = ? WHERE id = ?"
-	_, err := handler.db.Exec(query, newPassword, id)
+	_, err := handler.Db.Exec(query, newPassword, id)
 	if err != nil {
 		log.Fatal(err)
 	}
 	fmt.Printf("Updated password for record id %d\n", id)
+	return err
 }
 
-func (handler *DBHandler) nameExists(name string) bool {
+func (handler *DBHandler) NameExists(name string) (bool, error) {
 	query := "SELECT COUNT(*) FROM users WHERE name = ?"
 	var count int
-	err := handler.db.QueryRow(query, name).Scan(&count)
+	err := handler.Db.QueryRow(query, name).Scan(&count)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return count > 0
+	return count > 0, err
 }
 
-func (handler *DBHandler) passwordMatch(name string, password string) bool {
+func (handler *DBHandler) PasswordMatch(name string, password string) (bool, error) {
 	query := "SELECT COUNT(*) FROM users WHERE name = ? AND password = ?"
 	var count int
-	err := handler.db.QueryRow(query, name, password).Scan(&count)
+	err := handler.Db.QueryRow(query, name, password).Scan(&count)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return count > 0
+	return count > 0, err
+}
+
+func (handler *DBHandler) GetId(name string) (int, error) {
+	query := "SELECT id FROM users WHERE name = ?"
+	var id int
+	err := handler.Db.QueryRow(query, name).Scan(&id)
+	return id, err
+}
+
+func (handler *DBHandler) GetName(id int) (string, error) {
+	query := "SELECT name FROM users WHERE id = ?"
+	var name string
+	err := handler.Db.QueryRow(query, id).Scan(&name)
+	return name, err
 }
 
 // Close 关闭数据库连接
 func (handler *DBHandler) Close() {
-	err := handler.db.Close()
+	err := handler.Db.Close()
 	if err != nil {
 		return
 	}
