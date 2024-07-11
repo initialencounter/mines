@@ -27,26 +27,6 @@ func NewDBHandler(dsn string) (*DBHandler, error) {
 	return &DBHandler{Db: db}, nil
 }
 
-func test() {
-	dsn := "root:mines@tcp(localhost:3306)/mines"
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(db *sql.DB) {
-		err := db.Close()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}(db)
-
-	// 确认连接有效
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-}
-
 func (handler *DBHandler) CreateTable() {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
