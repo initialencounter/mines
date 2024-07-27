@@ -25,7 +25,7 @@ func Register(handler *database.DBHandler, c *fiber.Ctx) error {
 	if user == "" || pass == "" || email == "" {
 		return fiber.NewError(fiber.StatusBadRequest, "Invalid request body not enough data")
 	}
-	if res, _ := handler.NameExists(user); !res {
+	if res, _ := handler.NameExists(user); res {
 		return fiber.NewError(fiber.StatusConflict, "User already exists")
 	}
 	fmt.Println(user, pass, email)
