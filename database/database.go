@@ -153,6 +153,23 @@ func (handler *DBHandler) DecrementAttr(id int, attr string) error {
 	return err
 }
 
+func (handler *DBHandler) AddMedal(id int, score int) error {
+	if score == 0 {
+		return nil
+	}
+	var query = "UPDATE users SET medal = medal + ? WHERE id = ?"
+	if score < 0 {
+		score = -score
+		query = "UPDATE users SET medal = medal - ? WHERE id = ?"
+	}
+	_, err := handler.Db.Exec(query, score, id)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Decremented medal for record id %d\n", id)
+	return err
+}
+
 func (handler *DBHandler) DeleteRecord(id int) error {
 	query := "DELETE FROM users WHERE id = ?"
 	_, err := handler.Db.Exec(query, id)
