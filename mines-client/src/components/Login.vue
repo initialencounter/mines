@@ -16,8 +16,8 @@
           <el-form-item>
             <h1>亲，请登录</h1>
           </el-form-item>
-          <el-form-item label="用户名" prop="userId">
-            <el-input v-model="ruleForm.userId"/>
+          <el-form-item label="用户名" prop="userName">
+            <el-input v-model="ruleForm.userName"/>
           </el-form-item>
           <el-form-item label="密码" prop="password">
             <el-input v-model="ruleForm.password" type="password"/>
@@ -48,8 +48,8 @@
           <el-form-item>
             <h1>注册模式</h1>
           </el-form-item>
-          <el-form-item label="用户名" prop="userId">
-            <el-input v-model="ruleForm.userId"/>
+          <el-form-item label="用户名" prop="userName">
+            <el-input v-model="ruleForm.userName"/>
           </el-form-item>
           <el-form-item label="密码" prop="password">
             <el-input v-model="ruleForm.password" type="password"/>
@@ -91,7 +91,7 @@ const loading = ref(false)
 const showLogin = defineModel<boolean>({required: true})
 
 interface RuleForm {
-  userId: string
+  userName: string
   password: string
   checkPass: string
   email: string
@@ -100,14 +100,14 @@ interface RuleForm {
 const formSize = ref<ComponentSize>('default')
 const ruleFormRef = ref<FormInstance>()
 const ruleForm = reactive<RuleForm>({
-  userId: '',
+  userName: '',
   password: '',
   checkPass: '',
   email: '',
 })
 
 const rules = reactive<FormRules<RuleForm>>({
-  userId: [
+  userName: [
     {required: true, message: '请输入用户名！', trigger: 'blur'},
     {min: 3, max: 16, message: '长度应该为 3 - 16', trigger: 'blur'},
   ],
@@ -121,7 +121,7 @@ const rules = reactive<FormRules<RuleForm>>({
   ],
   email: [
     {required: true, message: '请输入邮箱！', trigger: 'blur'},
-    {min: 5, max: 16, message: '长度应该为 5 - 16', trigger: 'blur'},
+    {min: 5, max: 64, message: '长度应该为 5 - 64', trigger: 'blur'},
   ],
 })
 
@@ -147,7 +147,7 @@ const resetForm = (formEl: FormInstance | undefined) => {
 
 async function login() {
   loading.value = true
-  const {userId, password} = ruleForm
+  const {userName: userName, password} = ruleForm
   try {
     let config = {
       method: 'post',
@@ -157,14 +157,14 @@ async function login() {
         'Accept': '*/*',
       },
       data: {
-        user: userId,
+        user: userName,
         pass: password,
       }
     };
     const response = await axios(config);
     loading.value = false
     ElMessage({
-      message: `${userId}，欢迎回来！`,
+      message: `${userName}，欢迎回来！`,
       type: 'success',
       plain: true,
     })
@@ -172,6 +172,7 @@ async function login() {
     const token = response.data.token;
     localStorage.setItem('jwt', '20240704' + token);
     localStorage.setItem('userId', response.data.id);
+    localStorage.setItem('userName', userName)
   } catch (error: any) {
     loading.value = false
     ElNotification({
@@ -185,7 +186,7 @@ async function login() {
 
 const register = async () => {
   loading.value = true
-  const {userId, password, email} = ruleForm
+  const {userName, password, email} = ruleForm
   if (password !== ruleForm.checkPass) {
     ElMessage.error('两次密码不一致！')
     return
@@ -199,7 +200,7 @@ const register = async () => {
         'Accept': '*/*',
       },
       data: {
-        user: userId,
+        user: userName,
         pass: password,
         email: email
       }
@@ -207,7 +208,7 @@ const register = async () => {
     const response = await axios(config);
     loading.value = false
     ElMessage({
-      message: `${userId}，欢迎加入！`,
+      message: `${userName}，欢迎加入！`,
       type: 'success',
       plain: true,
     })
@@ -215,6 +216,7 @@ const register = async () => {
     const token = response.data.token;
     localStorage.setItem('jwt', '20240704' + token);
     localStorage.setItem('userId', response.data.id);
+    localStorage.setItem('userName', userName)
   } catch (error: any) {
     loading.value = false
     ElNotification({

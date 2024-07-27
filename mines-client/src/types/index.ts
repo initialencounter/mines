@@ -1,4 +1,4 @@
 import type {Cell, Minefield} from './Mines';
-import type {Response, Result} from './Request';
+import type {Response, Result, ScoreBoard} from './Request';
 
-export type {Minefield, Cell, Response, Result};
+export type {Minefield, Cell, Response, Result, ScoreBoard};

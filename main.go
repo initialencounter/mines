@@ -29,6 +29,7 @@ var assetFiles embed.FS
 
 var pool = utils.NewWebSocketPool()
 var nameCache = utils.NewNameCache()
+var scoreBoard = newScoreBoard()
 
 func main() {
 	var config = getConfig()
@@ -72,6 +73,12 @@ func main() {
 	app.Post("/login", func(c *fiber.Ctx) error { return fiberHandle.Login(handler, c) })
 	app.Post("/getMinefield", func(c *fiber.Ctx) error {
 		return c.JSON(m.openMinefield())
+	})
+
+	app.Post("/getRank", func(c *fiber.Ctx) error {
+		data, _ := handler.GetMedalRank()
+		jsonData, _ := json.Marshal(data)
+		return c.Send(jsonData)
 	})
 
 	app.Post("/newGame", func(c *fiber.Ctx) error {
@@ -166,21 +173,36 @@ func main() {
 				}
 				nameCache.Set(id, userName)
 			}
-			var response Response
 			result := m.openCells(message.Id)
-			response.NewPlayer = newPlayer
-			if name, ok := nameCache.Get(id); ok {
-				response.UserId = name
-			} else {
-				response.UserId = ""
-			}
-			response.ChangeCell = result
-			response.TimeStamp = message.TimeStamp
-			response.StartTimeStamp = m.StartTimeStamp
+			earnScore := scoreCalculator(message, result)
 
+			var response = Response{
+				NewPlayer:      newPlayer,
+				ChangeCell:     result,
+				TimeStamp:      message.TimeStamp,
+				StartTimeStamp: m.StartTimeStamp,
+				EarnScore:      earnScore,
+			}
+			if name, ok := nameCache.GetName(id); ok {
+				response.UserName = name
+			} else {
+				response.UserName = ""
+			}
+			scoreBoard.addScore(response.UserName, earnScore)
+			response.ScoreBoard = scoreBoard.Board
 			jsonData, err := json.Marshal(response)
 			if err != nil {
 				fmt.Println(err)
+			}
+			if result.Result.IsWin {
+				for name, score := range scoreBoard.Board {
+					userId, _ := nameCache.GetId(name)
+					err := handler.AddMedal(userId, score)
+					if err != nil {
+						return
+					}
+				}
+				scoreBoard.clear()
 			}
 			pool.BroadcastMessage(jsonData)
 			newPlayer = false
@@ -188,11 +210,10 @@ func main() {
 
 		// Remove connection from the pool
 		pool.Delete(id)
-		nameCache.Delete(id)
 		log.Println("WebSocket connection closed", userId)
 		var response Response
 		response.PlayerQuit = true
-		response.UserId = userId
+		response.UserName = userId
 		jsonData, err := json.Marshal(response)
 		if err != nil {
 			fmt.Println(err)

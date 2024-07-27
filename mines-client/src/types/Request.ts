@@ -11,13 +11,19 @@ interface Result {
     },
 }
 
+interface ScoreBoard {
+    [key: string]: number
+}
+
 interface Response  {
     PlayerQuit: boolean
     NewPlayer: boolean
-    UserId: string
+    UserName: string
     ChangeCell: Result
     TimeStamp: number
     StartTimeStamp: number
+    EarnScore: number
+    ScoreBoard: ScoreBoard
 }
 
-export type {Response, Result};
+export type {Response, Result, ScoreBoard};

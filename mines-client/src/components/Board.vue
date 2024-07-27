@@ -1,24 +1,27 @@
 <template>
   <div class="timeWatcher">{{ timeWatcher }}</div>
   <el-button class="logout-button" @click="logout">退出登录</el-button>
-  <div class="board" :style="{
+  <div :style="{
     gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
     gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`
-  }">
+  }" class="board">
     <div v-for="(cell, index) in minefield.Cell" :key="index"
          :style="{backgroundImage: `url(${getImageSrc(cell)})`}"
          class="cell"
          @mousedown="(event) => handleClick(event,index)">
     </div>
   </div>
+  <ScoreBoard :scoreBoard="scoreBoard" class="scoreBoard"></ScoreBoard>
+  <ScoreBoard :scoreBoard="totalScoreBoard" class="TotalBoard"></ScoreBoard>
 </template>
 
 <script lang="ts" setup>
-import {h, ref} from 'vue'
+import {ref} from 'vue'
 import axios from 'axios'
 import {host, port} from "@/utils";
-import {ElMessage, ElMessageBox, ElNotification} from "element-plus";
-import type {Cell, Minefield, Response} from "@/types";
+import {ElMessage, ElMessageBox, type MessageHandler} from "element-plus";
+import type {Cell, Minefield, Response, ScoreBoard as ScoreBoardType} from "@/types";
+import ScoreBoard from "@/components/ScoreBoard.vue";
 
 const cellSize = 24
 const minefield = ref<Minefield>({
@@ -37,10 +40,27 @@ let startTimeStamp = 0
 document.oncontextmenu = () => false;
 const userId = localStorage.getItem('userId')
 const token = (localStorage.getItem('jwt') ?? '').replace('20240704', '')
+const userName = localStorage.getItem('userName')
+const scoreBoard = ref<ScoreBoardType>({})
+const totalScoreBoard = ref<ScoreBoardType>({})
+let currentMessage: MessageHandler
+
+const getRank = async () => {
+  let config = {
+    method: 'post',
+    url: `http://${host}:${port}/getRank`,
+    headers: {
+      'Content-Type': 'application/xml',
+      'Accept': '*/*',
+    }
+  };
+  return (await axios(config)).data
+}
 
 const reConnect = () => {
   return new WebSocket(`ws://${host}:${port}/ws/${userId}?token=${token}`);
 }
+
 const getBoard = async () => {
   let config = {
     method: 'post',
@@ -51,6 +71,7 @@ const getBoard = async () => {
     }
   };
   minefield.value = (await axios(config)).data
+  totalScoreBoard.value = await getRank()
 }
 
 const getNewGame = async () => {
@@ -99,7 +120,7 @@ const getNearbyFlaggedCount = (nearbyCells: number[]) => {
   return count
 }
 
-const doFlag = (index: number) => {
+const doFlag = (index: number, now: number) => {
   const cell = minefield.value.Cell[index]
   let nearbyCells = getNearbyCells(index)
   if (cell.IsOpen && !cell.IsMine) {
@@ -114,7 +135,12 @@ const doFlag = (index: number) => {
       }
     }
   } else {
-    cell.IsFlagged = !cell.IsFlagged;
+    let data = {
+      Id: index,
+      IsFlag: true,
+      TimeStamp: now
+    }
+    ws.send(JSON.stringify(data));
   }
 }
 
@@ -137,6 +163,7 @@ const doOpen = (index: number, now: number) => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     let data = {
       Id: index,
+      IsFlag: false,
       TimeStamp: now
     }
     ws.send(JSON.stringify(data));
@@ -160,7 +187,7 @@ const handleClick = (event: MouseEvent, index: number) => {
     }, 1)
   }
   if (event.button === 2) {
-    doFlag(index)
+    doFlag(index, now)
   } else if (event.button === 0) {
     doOpen(index, now)
   }
@@ -226,30 +253,40 @@ function msToTime(duration: number): string {
 
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
-    if (data.NewPlayer) {
-      ElNotification({
-        title: 'Success',
-        message: h('i', { style: 'color: teal' }, data.UserId + ' 加入了游戏！'),
-      })
+  if(data.UserName === userName && data.EarnScore ){
+    if (currentMessage) {
+      currentMessage.close()
     }
-    if (data.PlayerQuit) {
-      ElNotification({
-        title: 'Success',
-        message: h('i', { style: 'color: teal' }, data.UserId + ' 离开了游戏！'),
-      })
-      return
-    }
+    currentMessage = ElMessage({
+      type: 'success',
+      message: '获得积分：'+data.EarnScore,
+    })
+  }
+  if (data.NewPlayer && data.UserName != userName) {
+    ElMessage({
+      type: 'success',
+      message: data.UserName+ ' 加入了游戏！',
+    })
+  }
+  if (data.PlayerQuit) {
+    ElMessage({
+      type: 'success',
+      message: data.UserName + ' 离开了游戏！',
+    })
+    return
+  }
   for (let i = 0; i < data.ChangeCell.Cell.length; i++) {
     minefield.value.Cell[data.ChangeCell.Cell[i].Id] = data.ChangeCell.Cell[i]
   }
-  startTimeStamp = data.StartTimeStamp
+  startTimeStamp = data.StartTimeStamp ?? {name1: 0, name2: 2}
+  scoreBoard.value = data.ScoreBoard
   if (data.ChangeCell.Result.IsWin) {
-    if(timer){
+    if (timer) {
       clearInterval(intervalFlag)
       timer = false
     }
-    ElMessageBox.confirm(
-        `${decodeURIComponent(data.UserId)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`,
+    let confirm = await ElMessageBox.confirm(
+        `${decodeURIComponent(data.UserName)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`,
         'Success',
         {
           confirmButtonText: 'OK',
@@ -257,17 +294,10 @@ ws.onmessage = async (event) => {
           type: 'success',
         }
     )
-        .then(async () => {
-          await getNewGame()
-          await getBoard()
-        })
-        .catch(() => {
-          ElMessage({
-            type: 'info',
-            message: '取消了再来一局！',
-          })
-        })
-
+    if (confirm === 'confirm') {
+      await getNewGame()
+      await getBoard()
+    }
   }
 }
 
@@ -312,4 +342,19 @@ function logout() {
   right: 20px; /* Adjust as needed */
   z-index: 100; /* Ensure it's above other content */
 }
+
+.scoreBoard {
+  position: absolute;
+  top: 60px; /* Adjust as needed */
+  right: 205px; /* Adjust as needed */
+  z-index: 100; /* Ensure it's above other content */
+}
+
+.TotalBoard {
+  position: absolute;
+  top: 60px; /* Adjust as needed */
+  right: 20px; /* Adjust as needed */
+  z-index: 100; /* Ensure it's above other content */
+}
+
 </style>

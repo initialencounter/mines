@@ -149,7 +149,6 @@ func (handler *DBHandler) DecrementAttr(id int, attr string) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Decremented medal for record id %d\n", id)
 	return err
 }
 
@@ -166,7 +165,6 @@ func (handler *DBHandler) AddMedal(id int, score int) error {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Decremented medal for record id %d\n", id)
 	return err
 }
 
@@ -222,6 +220,32 @@ func (handler *DBHandler) GetName(id int) (string, error) {
 	var name string
 	err := handler.Db.QueryRow(query, id).Scan(&name)
 	return name, err
+}
+
+func (handler *DBHandler) GetMedalRank() (map[string]int, error) {
+	query := "SELECT name, medal FROM users ORDER BY medal DESC"
+	rows, err := handler.Db.Query(query)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(rows *sql.Rows) {
+		err := rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rows)
+
+	rank := make(map[string]int)
+	for rows.Next() {
+		var name string
+		var medal int
+		err := rows.Scan(&name, &medal)
+		if err != nil {
+			log.Fatal(err)
+		}
+		rank[name] = medal
+	}
+	return rank, err
 }
 
 // Close 关闭数据库连接

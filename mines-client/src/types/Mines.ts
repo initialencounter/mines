@@ -1,3 +1,5 @@
+import type {ScoreBoard as ScoreBoardType} from "@/types/Request";
+
 interface Cell {
     Id: number
     Mines: number
