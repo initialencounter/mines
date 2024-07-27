@@ -38,16 +38,34 @@ type ChangeCell struct {
 
 type Request struct {
 	Id        int
+	IsFlag    bool
 	TimeStamp int64
 }
 
 type Response struct {
 	PlayerQuit     bool
 	NewPlayer      bool
-	UserId         string
+	UserName       string
 	ChangeCell     ChangeCell
 	TimeStamp      int64
 	StartTimeStamp int64
+	EarnScore      int
+	ScoreBoard     map[string]int
+}
+
+func (m *Minefield) doFlag(id int) ChangeCell {
+	if m.First {
+		m.StartTimeStamp = time.Now().UnixMilli()
+		m.First = false
+		ignoreCells := m.getNearbyCells(id)
+		m.randomShot(ignoreCells)
+		m.countMines()
+	}
+	var changes []Cell
+	m.Cell[id].IsOpen = true
+	changes = append(changes, m.Cell[id])
+	stats := m.getStats(id)
+	return ChangeCell{stats, changes}
 }
 
 func (m *Minefield) openCells(id int) ChangeCell {
