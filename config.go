@@ -27,11 +27,18 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 }
 
+type SmtpConfig struct {
+	SmtpServer string `mapstructure:"smtpServer"`
+	Email      string `mapstructure:"email"`
+	Password   string `mapstructure:"password"`
+}
+
 type Config struct {
 	App      AppConfig      `mapstructure:"app"`
 	Server   ServerConfig   `mapstructure:"server"`
 	Mine     MineConfig     `mapstructure:"mine"`
 	Database DatabaseConfig `mapstructure:"database"`
+	Smtp     SmtpConfig     `mapstructure:"smtp"`
 }
 
 func getConfig() Config {
@@ -62,6 +69,10 @@ database:
   port: 3306
   user: "root"
   password: "mines"
+smtp:
+  smtpServer: "smtp.gmail.com"
+  email: "smtp.gmail.com"
+  password: 587
 `)
 
 		err := os.WriteFile(configFile, defaultConfig, 0644)
