@@ -13,6 +13,7 @@
   </div>
   <ScoreBoard :scoreBoard="scoreBoard" class="scoreBoard"></ScoreBoard>
   <ScoreBoard :scoreBoard="totalScoreBoard" class="TotalBoard"></ScoreBoard>
+  <ScoreTip ref="scoreTip" class="scoreTipParent"></ScoreTip>
 </template>
 
 <script lang="ts" setup>
@@ -22,6 +23,7 @@ import {host, port} from "@/utils";
 import {ElMessage, ElMessageBox, type MessageHandler} from "element-plus";
 import type {Cell, Minefield, Response, ScoreBoard as ScoreBoardType} from "@/types";
 import ScoreBoard from "@/components/ScoreBoard.vue";
+import ScoreTip from "@/components/ScoreTip.vue";
 
 const cellSize = 24
 const minefield = ref<Minefield>({
@@ -43,7 +45,7 @@ const token = (localStorage.getItem('jwt') ?? '').replace('20240704', '')
 const userName = localStorage.getItem('userName')
 const scoreBoard = ref<ScoreBoardType>({})
 const totalScoreBoard = ref<ScoreBoardType>({})
-let currentMessage: MessageHandler
+const scoreTip = ref<InstanceType<typeof ScoreTip>>()
 
 const getRank = async () => {
   let config = {
@@ -254,13 +256,9 @@ function msToTime(duration: number): string {
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
   if(data.UserName === userName && data.EarnScore ){
-    if (currentMessage) {
-      currentMessage.close()
+    if (scoreTip.value) {
+      scoreTip.value.tips(data.EarnScore)
     }
-    currentMessage = ElMessage({
-      type: 'success',
-      message: '获得积分：'+data.EarnScore,
-    })
   }
   if (data.NewPlayer && data.UserName != userName) {
     ElMessage({
@@ -328,12 +326,13 @@ function logout() {
 }
 
 .timeWatcher {
-  position: absolute;
+  position: fixed;
   top: 20px; /* Adjust as needed */
   left: 20px;
   font-size: 26px;
   font-weight: bold;
   color: #00bd7e;
+  z-index: 100;
 }
 
 .logout-button {
@@ -344,17 +343,24 @@ function logout() {
 }
 
 .scoreBoard {
-  position: absolute;
+  position: fixed;
   top: 60px; /* Adjust as needed */
   right: 205px; /* Adjust as needed */
   z-index: 100; /* Ensure it's above other content */
 }
 
 .TotalBoard {
-  position: absolute;
+  position: fixed;
   top: 60px; /* Adjust as needed */
   right: 20px; /* Adjust as needed */
   z-index: 100; /* Ensure it's above other content */
+}
+
+.scoreTipParent {
+  position: fixed;
+  top: 30px; /* Adjust as needed */
+  right: 50%; /* Adjust as needed */
+  z-index: 999; /* Ensure it's above other content */
 }
 
 </style>
