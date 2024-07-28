@@ -20,8 +20,8 @@
 import {ref} from 'vue'
 import axios from 'axios'
 import {host, port} from "@/utils";
-import {ElMessage, ElMessageBox } from "element-plus";
-import type {Cell, Minefield, Response, ScoreBoard as ScoreBoardType} from "@/types";
+import {ElMessage, ElMessageBox} from "element-plus";
+import type {Cell, Minefield, RequestType, Response, ScoreBoard as ScoreBoardType} from "@/types";
 import ScoreBoard from "@/components/ScoreBoard.vue";
 import ScoreTip from "@/components/ScoreTip.vue";
 
@@ -113,63 +113,71 @@ const getNearbyFlaggedCount = (nearbyCells: number[]) => {
   return count
 }
 
-const doFlag = (index: number, now: number) => {
+const doFlag = (index: number, now: number): number[] => {
   const cell = minefield.value.Cell[index]
   let nearbyCells = getNearbyCells(index)
+  const openCells: number[] = []
   if (cell.IsOpen && !cell.IsMine) {
     let flagCount = getNearbyFlaggedCount(nearbyCells)
     if (flagCount < 1) {
-      return
+      return []
     }
     if (flagCount === cell.Mines) {
       for (let i of nearbyCells) {
-        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine ) {
-          doOpen(i, now)
+        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine) {
+          openCells.push(...doOpen(i))
         }
       }
+      return openCells
+    }else {
+      return []
     }
-    return
   } else {
-    let data = {
-      Id: index,
+    let data: RequestType = {
+      Ids: [index],
       IsFlag: true,
       TimeStamp: now
     }
     ws.send(JSON.stringify(data));
+    return []
   }
 }
 
-const doOpen = (index: number, now: number) => {
+const doOpen = (index: number): number[] => {
   const cell = minefield.value.Cell[index]
   let nearbyCells = getNearbyCells(index)
+  const openCells: number[] = []
   if (cell.IsOpen && !cell.IsMine) {
     let flagCount = getNearbyFlaggedCount(nearbyCells)
     if (flagCount < 1) {
-      return
+      return []
     }
     if (flagCount === cell.Mines) {
       for (let i of nearbyCells) {
-        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine ) {
-          doOpen(i, now)
+        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine) {
+          openCells.push(...doOpen(i))
         }
       }
     }
-    return
+    return openCells
   }
+  openCells.push(index)
   cell.IsOpen = !cell.IsOpen;
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    let data = {
-      Id: index,
-      IsFlag: false,
-      TimeStamp: now
-    }
-    ws.send(JSON.stringify(data));
-  }
   if (cell.Mines === 0) {
     for (let i = 0; i < nearbyCells.length; i++) {
-      doOpen(nearbyCells[i], now)
+      openCells.push(...doOpen(nearbyCells[i]))
     }
   }
+  return openCells
+}
+
+const sendOpenList = async (openList: number[], now: number) => {
+  let data: RequestType = {
+    Ids: openList,
+    IsFlag: false,
+    TimeStamp: now
+  }
+  ws.send(JSON.stringify(data));
 }
 
 let timer = false
@@ -183,10 +191,14 @@ const handleClick = (event: MouseEvent, index: number) => {
       timeWatcher.value = msToTime(now1 - startTimeStamp)
     }, 1)
   }
+  let openCells: number[]
   if (event.button === 2) {
-    doFlag(index, now)
-  } else if (event.button === 0) {
-    doOpen(index, now)
+    openCells = doFlag(index, now)
+  } else{
+    openCells = doOpen(index)
+  }
+  if (openCells.length > 0){
+    sendOpenList(openCells, now)
   }
 }
 
@@ -250,7 +262,7 @@ function msToTime(duration: number): string {
 
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
-  if(data.UserName === userName && data.EarnScore ){
+  if (data.UserName === userName && data.EarnScore) {
     if (scoreTip.value) {
       scoreTip.value.tips(data.EarnScore)
     }
@@ -258,7 +270,7 @@ ws.onmessage = async (event) => {
   if (data.NewPlayer && data.UserName != userName) {
     ElMessage({
       type: 'success',
-      message: data.UserName+ ' 加入了游戏！',
+      message: data.UserName + ' 加入了游戏！',
     })
   }
   if (data.PlayerQuit) {

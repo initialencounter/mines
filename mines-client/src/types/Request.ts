@@ -26,4 +26,10 @@ interface Response  {
     ScoreBoard: ScoreBoard
 }
 
-export type {Response, Result, ScoreBoard};
+interface RequestType {
+    Ids: number[],
+    IsFlag: boolean,
+    TimeStamp: number
+}
+
+export type {Response, Result, ScoreBoard, RequestType};
