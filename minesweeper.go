@@ -37,7 +37,7 @@ type ChangeCell struct {
 }
 
 type Request struct {
-	Id        int
+	Ids       []int
 	IsFlag    bool
 	TimeStamp int64
 }
@@ -68,21 +68,24 @@ func (m *Minefield) doFlag(id int) ChangeCell {
 	return ChangeCell{stats, changes}
 }
 
-func (m *Minefield) openCells(id int) ChangeCell {
+func (m *Minefield) openCells(ids []int) ChangeCell {
 	if m.First {
 		m.StartTimeStamp = time.Now().UnixMilli()
 		m.First = false
-		ignoreCells := m.getNearbyCells(id)
+		ignoreCells := m.getNearbyCells(ids[0])
 		m.randomShot(ignoreCells)
 		m.countMines()
 	}
 	var changes []Cell
-	m.Cell[id].IsOpen = true
-	if m.Cell[id].Mines == 0 {
-		changes = append(changes, m.autoOpenCells(id)...)
+	for i := 0; i < len(ids); i++ {
+		id := ids[i]
+		m.Cell[id].IsOpen = true
+		if m.Cell[id].Mines == 0 {
+			changes = append(changes, m.autoOpenCells(id)...)
+		}
+		changes = append(changes, m.Cell[id])
 	}
-	changes = append(changes, m.Cell[id])
-	stats := m.getStats(id)
+	stats := m.getStats(ids[0])
 	return ChangeCell{stats, changes}
 }
 

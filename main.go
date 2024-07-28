@@ -173,7 +173,7 @@ func main() {
 				}
 				nameCache.Set(id, userName)
 			}
-			result := m.openCells(message.Id)
+			result := m.openCells(message.Ids)
 			earnScore := scoreCalculator(message, result)
 
 			var response = Response{
