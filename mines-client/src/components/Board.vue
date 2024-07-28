@@ -102,20 +102,11 @@ ws.onclose = () => {
   ws = reConnect()
   getBoard()
 }
-const getNearbyUnFlaggedCells = (nearbyCells: number[]) => {
-  let nearbyUnFlaggedCells = []
-  for (let i = 0; i < nearbyCells.length; i++) {
-    if (!minefield.value.Cell[nearbyCells[i]].IsFlagged && !minefield.value.Cell[nearbyCells[i]].IsOpen) {
-      nearbyUnFlaggedCells.push(nearbyCells[i])
-    }
-  }
-  return nearbyUnFlaggedCells
-}
 
 const getNearbyFlaggedCount = (nearbyCells: number[]) => {
   let count = 0
   for (let i = 0; i < nearbyCells.length; i++) {
-    if (minefield.value.Cell[nearbyCells[i]].IsFlagged || minefield.value.Cell[nearbyCells[i]].IsOpen && minefield.value.Cell[nearbyCells[i]].IsMine) {
+    if (minefield.value.Cell[nearbyCells[i]].IsFlagged || minefield.value.Cell[nearbyCells[i]].IsMine) {
       count++
     }
   }
@@ -131,11 +122,13 @@ const doFlag = (index: number, now: number) => {
       return
     }
     if (flagCount === cell.Mines) {
-      let unFlaggedCells = getNearbyUnFlaggedCells(nearbyCells)
-      for (let i of unFlaggedCells) {
-        doOpen(i, 0)
+      for (let i of nearbyCells) {
+        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine ) {
+          doOpen(i, now)
+        }
       }
     }
+    return
   } else {
     let data = {
       Id: index,
@@ -155,11 +148,13 @@ const doOpen = (index: number, now: number) => {
       return
     }
     if (flagCount === cell.Mines) {
-      let unFlaggedCells = getNearbyUnFlaggedCells(nearbyCells)
-      for (let i of unFlaggedCells) {
-        doOpen(i, now)
+      for (let i of nearbyCells) {
+        if (!minefield.value.Cell[i].IsOpen && !minefield.value.Cell[i].IsFlagged && !minefield.value.Cell[i].IsMine ) {
+          doOpen(i, now)
+        }
       }
     }
+    return
   }
   cell.IsOpen = !cell.IsOpen;
   if (ws && ws.readyState === WebSocket.OPEN) {

@@ -5,7 +5,6 @@ const scoreTipList = ref<{
   name: string
 }[]>([])
 const tips = (score: number) => {
-  console.log(score)
   if (score === 0) return
   const tipText = '积分' + (score > 0 ? '+' + score : score)
   if(scoreTipList.value.length > 10) scoreTipList.value=[]
@@ -46,7 +45,7 @@ defineExpose({
   color: #2b8a2d;
   width: 10rem;
   opacity: 0;
-  animation: moveAndFade 1s ease-out;
+  animation: moveAndFade 2s ease-out;
 }
 
 </style>

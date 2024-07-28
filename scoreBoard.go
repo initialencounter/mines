@@ -52,7 +52,7 @@ func scoreCalculator(message Request, result ChangeCell) int {
 		if result.Result.IsBoom {
 			return -1
 		} else {
-			return 1
+			return len(result.Cell)
 		}
 	}
 }
