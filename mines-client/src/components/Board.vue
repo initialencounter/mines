@@ -20,7 +20,7 @@
 import {ref} from 'vue'
 import axios from 'axios'
 import {host, port} from "@/utils";
-import {ElMessage, ElMessageBox, type MessageHandler} from "element-plus";
+import {ElMessage, ElMessageBox } from "element-plus";
 import type {Cell, Minefield, Response, ScoreBoard as ScoreBoardType} from "@/types";
 import ScoreBoard from "@/components/ScoreBoard.vue";
 import ScoreTip from "@/components/ScoreTip.vue";
