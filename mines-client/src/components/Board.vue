@@ -1,6 +1,9 @@
 <template>
   <div class="timeWatcher">{{ timeWatcher }}</div>
   <el-button class="logout-button" @click="logout">退出登录</el-button>
+  <el-button :style="{background:flagMode?'#5282b8':'#5c8f4b'}" class="flag-switch-button"
+             @click="flagMode = !flagMode">{{ flagMode ? "标记" : "挖开" }}模式
+  </el-button>
   <div :style="{
     gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
     gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`
@@ -55,7 +58,7 @@ const flagSound = new Howl({
   src: ['/src/assets/audio/flag.mp3'],
   volume: 0.5
 })
-
+const flagMode = ref(false)
 const getRank = async () => {
   let config = {
     method: 'post',
@@ -138,7 +141,7 @@ const doFlag = (index: number, now: number): number[] => {
         }
       }
       return openCells
-    }else {
+    } else {
       return []
     }
   } else {
@@ -147,6 +150,7 @@ const doFlag = (index: number, now: number): number[] => {
       IsFlag: true,
       TimeStamp: now
     }
+    flagSound.play()
     ws.send(JSON.stringify(data));
     return []
   }
@@ -203,14 +207,23 @@ const handleClick = (event: MouseEvent, index: number) => {
   let openCells: number[]
   flagSound.stop()
   openSound.stop()
-  if (event.button === 2) {
-    flagSound.play()
+
+  const isRightClick = event.button === 2
+  const shouldFlag = isRightClick !== flagMode.value
+
+  if (shouldFlag) {
     openCells = doFlag(index, now)
-  } else{
-    openSound.play()
+    if (openCells.length > 0) {
+      flagSound.play()
+    }
+  } else {
     openCells = doOpen(index)
+    if (openCells.length > 0) {
+      openSound.play()
+    }
   }
-  if (openCells.length > 0){
+
+  if (openCells.length > 0) {
     sendOpenList(openCells, now)
   }
 }
@@ -322,7 +335,6 @@ ws.onmessage = async (event) => {
 function logout() {
   localStorage.removeItem('jwt');
   localStorage.removeItem('userId');
-  // Redirect to login page or refresh the page
   showLogin.value = true;
 }
 
@@ -359,6 +371,13 @@ function logout() {
   position: absolute;
   top: 20px; /* Adjust as needed */
   right: 20px; /* Adjust as needed */
+  z-index: 100; /* Ensure it's above other content */
+}
+
+.flag-switch-button {
+  position: absolute;
+  top: 20px; /* Adjust as needed */
+  right: 120px; /* Adjust as needed */
   z-index: 100; /* Ensure it's above other content */
 }
 
