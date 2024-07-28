@@ -24,6 +24,7 @@ import {ElMessage, ElMessageBox} from "element-plus";
 import type {Cell, Minefield, RequestType, Response, ScoreBoard as ScoreBoardType} from "@/types";
 import ScoreBoard from "@/components/ScoreBoard.vue";
 import ScoreTip from "@/components/ScoreTip.vue";
+import {Howl} from 'howler';
 
 const cellSize = 24
 const minefield = ref<Minefield>({
@@ -46,6 +47,14 @@ const userName = localStorage.getItem('userName')
 const scoreBoard = ref<ScoreBoardType>({})
 const totalScoreBoard = ref<ScoreBoardType>({})
 const scoreTip = ref<InstanceType<typeof ScoreTip>>()
+const openSound = new Howl({
+  src: ['/src/assets/audio/open.mp3'],
+  volume: 0.5
+})
+const flagSound = new Howl({
+  src: ['/src/assets/audio/flag.mp3'],
+  volume: 0.5
+})
 
 const getRank = async () => {
   let config = {
@@ -192,9 +201,13 @@ const handleClick = (event: MouseEvent, index: number) => {
     }, 1)
   }
   let openCells: number[]
+  flagSound.stop()
+  openSound.stop()
   if (event.button === 2) {
+    flagSound.play()
     openCells = doFlag(index, now)
   } else{
+    openSound.play()
     openCells = doOpen(index)
   }
   if (openCells.length > 0){
