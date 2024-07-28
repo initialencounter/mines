@@ -80,7 +80,7 @@ func (m *Minefield) openCells(ids []int) ChangeCell {
 	for i := 0; i < len(ids); i++ {
 		id := ids[i]
 		m.Cell[id].IsOpen = true
-		if m.Cell[id].Mines == 0 {
+		if m.Cell[id].Mines == 0 && !m.Cell[id].IsMine {
 			changes = append(changes, m.autoOpenCells(id)...)
 		}
 		changes = append(changes, m.Cell[id])
