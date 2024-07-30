@@ -2,61 +2,53 @@ package smtp
 
 import (
 	"fmt"
-	"net"
 	"net/smtp"
-	"strings"
 )
 
-type Smtp struct {
-	SmtpServer string `mapstructure:"smtpServer"`
-	Email      string `mapstructure:"email"`
-	Password   string `mapstructure:"password"`
-	Host       string `mapstructure:"host"`
+type MailConfig struct {
+	Host     string `mapstructure:"host"`
+	Port     string `mapstructure:"port"`
+	TLS      bool   `mapstructure:"tls"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
-func NewSmtp(SmtpServer string, Email string, Password string) *Smtp {
-	var Host, _ = GetSMTPServer(Email)
-	return &Smtp{
-		SmtpServer,
-		Email,
-		Password,
-		Host,
+type SMTP struct {
+	host string
+	port string
+	auth smtp.Auth
+	from string
+}
+
+func NewSMTP(config MailConfig) *SMTP {
+	auth := smtp.PlainAuth("", config.Username, config.Password, config.Host)
+
+	return &SMTP{
+		host: config.Host,
+		port: config.Port,
+		auth: auth,
+		from: config.Username,
 	}
+
 }
 
-func (s *Smtp) SendEmail(to string, subject string, body string) error {
-	// 设置SMTP认证
-	auth := smtp.PlainAuth("", s.Email, s.Password, s.Host)
-
-	// 邮件消息
-	message := []byte(subject + "\n" + body)
-
-	// 发送邮件
-	err := smtp.SendMail(s.SmtpServer, auth, s.Email, []string{to}, message)
-	return err
+type SendOptions struct {
+	To      []string
+	Subject string
+	Body    string
 }
 
-// GetSMTPServer 从邮箱地址中提取 SMTP 服务器地址
-func GetSMTPServer(email string) (string, error) {
-	// 提取域名
-	domain := strings.Split(email, "@")[1]
+func (s *SMTP) SendEmail(options SendOptions) (string, error) {
+	addr := fmt.Sprintf("%s:%s", s.host, s.port)
+	msg := []byte("From: " + s.from + "\r\n" +
+		"To: " + options.To[0] + "\r\n" +
+		"Subject: " + options.Subject + "\r\n" +
+		"\r\n" +
+		options.Body)
 
-	// 查询 MX 记录
-	mxRecords, err := net.LookupMX(domain)
+	err := smtp.SendMail(addr, s.auth, s.from, options.To, msg)
 	if err != nil {
-		return "", fmt.Errorf("failed to lookup MX records: %v", err)
+		return "", err
 	}
-
-	if len(mxRecords) == 0 {
-		return "", fmt.Errorf("no MX records found for domain: %s", domain)
-	}
-
-	// 返回第一个 MX 记录的地址
-	smtpServer := mxRecords[0].Host
-	// 去除结尾的点
-	if strings.HasSuffix(smtpServer, ".") {
-		smtpServer = strings.TrimSuffix(smtpServer, ".")
-	}
-
-	return smtpServer, nil
+	return "Message Sent", nil
 }

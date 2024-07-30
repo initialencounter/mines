@@ -6,15 +6,17 @@ server:
   port: 8080
   host: "localhost"
 mine:
-  width: 30
-  height: 16
-  mines: 99
+  width: 50
+  height: 50
+  mines: 600
 database:
   host: "localhost"
   port: 3306
   user: "root"
   password: "mines"
 smtp:
-  smtpServer: "smtp.gmail.com"
-  email: "smtp.gmail.com"
-  password: 587
+  host: "example.gmail.com"
+  port: "587"
+  tls: true
+  username: ""
+  password: ""

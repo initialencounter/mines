@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/viper"
 	"log"
+	"main/smtp"
 	"os"
 )
 
@@ -27,18 +28,12 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 }
 
-type SmtpConfig struct {
-	SmtpServer string `mapstructure:"smtpServer"`
-	Email      string `mapstructure:"email"`
-	Password   string `mapstructure:"password"`
-}
-
 type Config struct {
-	App      AppConfig      `mapstructure:"app"`
-	Server   ServerConfig   `mapstructure:"server"`
-	Mine     MineConfig     `mapstructure:"mine"`
-	Database DatabaseConfig `mapstructure:"database"`
-	Smtp     SmtpConfig     `mapstructure:"smtp"`
+	App      AppConfig       `mapstructure:"app"`
+	Server   ServerConfig    `mapstructure:"server"`
+	Mine     MineConfig      `mapstructure:"mine"`
+	Database DatabaseConfig  `mapstructure:"database"`
+	Smtp     smtp.MailConfig `mapstructure:"smtp"`
 }
 
 func getConfig() Config {
@@ -70,9 +65,11 @@ database:
   user: "root"
   password: "mines"
 smtp:
-  smtpServer: "smtp.gmail.com"
-  email: "smtp.gmail.com"
-  password: 587
+  host: "example.gmail.com"
+  port: "587"
+  tls: true
+  username: ""
+  password: ""
 `)
 
 		err := os.WriteFile(configFile, defaultConfig, 0644)
