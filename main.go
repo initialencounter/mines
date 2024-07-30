@@ -30,6 +30,7 @@ var assetFiles embed.FS
 var pool = utils.NewWebSocketPool()
 var nameCache = utils.NewNameCache()
 var scoreBoard = newScoreBoard()
+var codeCache = utils.NewCodeCache()
 
 func main() {
 	var config = getConfig()
@@ -71,6 +72,8 @@ func main() {
 
 	app.Post("/register", func(c *fiber.Ctx) error { return fiberHandle.Register(handler, c) })
 	app.Post("/login", func(c *fiber.Ctx) error { return fiberHandle.Login(handler, c) })
+	app.Post("/forgotPassword", func(c *fiber.Ctx) error { return fiberHandle.ForgotPassword(handler, c, config.Smtp, codeCache) })
+	app.Post("/resetPassword", func(c *fiber.Ctx) error { return fiberHandle.ResetPassword(handler, c, codeCache) })
 	app.Post("/getMinefield", func(c *fiber.Ctx) error {
 		return c.JSON(m.openMinefield())
 	})

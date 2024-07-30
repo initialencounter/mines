@@ -3,7 +3,7 @@
     <el-container>
       <el-header></el-header>
       <el-main>
-        <el-form v-if="!registerMode" ref="ruleFormRef"
+        <el-form ref="ruleFormRef"
                  v-loading="loading"
                  :model="ruleForm"
                  :rules="rules"
@@ -14,61 +14,36 @@
                  style="max-width: 500px"
         >
           <el-form-item>
-            <h1>亲，请登录</h1>
+            <h1>{{ modes.register ? "注册模式" : (modes.login ? "亲，请登录" : "找回密码，若忘记用户名，请联系管理员！") }}</h1>
           </el-form-item>
           <el-form-item label="用户名" prop="userName">
             <el-input v-model="ruleForm.userName"/>
           </el-form-item>
-          <el-form-item label="密码" prop="password">
+          <el-form-item v-if="!modes.verify" :label="(modes.reset?'新密码':'密码')" prop="password">
             <el-input v-model="ruleForm.password" type="password"/>
           </el-form-item>
-          <el-form-item>
-            <div class="config-button">
-              <el-button type="primary" @click="submitForm(ruleFormRef)">登录</el-button>
-              <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
-              <el-button type="info">忘记密码</el-button>
-            </div>
-          </el-form-item>
-          <el-form-item>
-            <div class="config-button">
-              <el-button type="primary" @click="switchMode">没有账号！点我注册！</el-button>
-            </div>
-          </el-form-item>
-        </el-form>
-        <el-form v-if="registerMode" ref="ruleFormRef"
-                 v-loading="loading"
-                 :model="ruleForm"
-                 :rules="rules"
-                 :size="formSize"
-                 class="demo-ruleForm"
-                 label-width="auto"
-                 status-icon
-                 style="max-width: 500px"
-        >
-          <el-form-item>
-            <h1>注册模式</h1>
-          </el-form-item>
-          <el-form-item label="用户名" prop="userName">
-            <el-input v-model="ruleForm.userName"/>
-          </el-form-item>
-          <el-form-item label="密码" prop="password">
-            <el-input v-model="ruleForm.password" type="password"/>
-          </el-form-item>
-          <el-form-item label="确认密码" prop="checkPass">
+          <el-form-item v-if="!modes.login && !modes.verify" label="确认密码" prop="checkPass">
             <el-input v-model="ruleForm.checkPass" type="password"/>
           </el-form-item>
-          <el-form-item label="email" prop="email">
+          <el-form-item v-if="modes.register || modes.verify" label="email" prop="email">
             <el-input v-model="ruleForm.email"/>
+          </el-form-item>
+          <el-form-item v-if="modes.reset" label="验证码" prop="code">
+            <el-input v-model="ruleForm.checkPass" type="password"/>
           </el-form-item>
           <el-form-item>
             <div class="config-button">
-              <el-button type="primary" @click="submitForm(ruleFormRef)">注册</el-button>
+              <el-button type="primary" @click="submitForm(ruleFormRef)">
+                {{ modes.register ? "注册" : (modes.login ? "登录" : "发送验证码") }}
+              </el-button>
               <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
             </div>
           </el-form-item>
           <el-form-item>
             <div class="config-button">
-              <el-button type="primary" @click="login">已有账号！点我登录！</el-button>
+              <el-button v-if="!modes.login" type="primary" @click="switchMode('login')">已有账号！点我登录！</el-button>
+              <el-button v-if="!modes.register" type="primary" @click="switchMode('register')">没有账号！点我注册！</el-button>
+              <el-button v-if="!modes.verify && !modes.reset" type="primary" @click="switchMode('verify')">忘记密码！点我找回！</el-button>
             </div>
           </el-form-item>
         </el-form>
@@ -86,7 +61,9 @@ import {host, port} from "@/utils";
 
 import {type ComponentSize, ElMessage, ElNotification, type FormInstance, type FormRules} from 'element-plus'
 
-const registerMode = ref(false)
+const modes = ref<{ login: boolean, register: boolean, reset: boolean, verify: boolean }>({login: true, register: false, reset: false, verify: false})
+type Mode = 'login' | 'register' | 'reset' | 'verify'
+
 const loading = ref(false)
 const showLogin = defineModel<boolean>({required: true})
 
@@ -95,6 +72,7 @@ interface RuleForm {
   password: string
   checkPass: string
   email: string
+  code: string
 }
 
 const formSize = ref<ComponentSize>('default')
@@ -104,6 +82,7 @@ const ruleForm = reactive<RuleForm>({
   password: '',
   checkPass: '',
   email: '',
+  code: '',
 })
 
 const rules = reactive<FormRules<RuleForm>>({
@@ -123,16 +102,33 @@ const rules = reactive<FormRules<RuleForm>>({
     {required: true, message: '请输入邮箱！', trigger: 'blur'},
     {min: 5, max: 64, message: '长度应该为 5 - 64', trigger: 'blur'},
   ],
+  code: [
+    {required: true, message: '请输入验证码！', trigger: 'blur'},
+    {min: 6, max: 6, message: '长度应该为 6', trigger: 'blur'},
+  ],
 })
 
 const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
   await formEl.validate((valid) => {
     if (valid) {
-      if (registerMode.value)
+      if (modes.value.register)
         register()
-      else {
+      else if(modes.value.login){
         login()
+      }else if(modes.value.reset){
+        ElMessage({
+          message: '找回密码功能暂未开放！',
+          type: 'warning',
+          plain: true,
+        })
+      }
+      else {
+        ElMessage({
+          message: '验证功能暂未开放！',
+          type: 'warning',
+          plain: true,
+        })
       }
     } else {
       ElMessage.error('error submit!')
@@ -227,8 +223,10 @@ const register = async () => {
     })
   }
 }
-const switchMode = () => {
-  registerMode.value = !registerMode.value
+const switchMode = (mode: Mode) => {
+  for (const key of Object.keys(modes.value) as Mode[]) {
+    modes.value[key] = (key === mode);
+  }
 }
 </script>
 

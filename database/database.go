@@ -188,6 +188,16 @@ func (handler *DBHandler) ChangePassword(id int, newPassword string) error {
 	return err
 }
 
+func (handler *DBHandler) ChangePasswordByName(name string, newPassword string) error {
+	query := "UPDATE users SET password = ? WHERE name = ?"
+	_, err := handler.Db.Exec(query, newPassword, name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Updated password for record name %s\n", name)
+	return err
+}
+
 func (handler *DBHandler) NameExists(name string) (bool, error) {
 	query := "SELECT COUNT(*) FROM users WHERE name = ?"
 	var count int
@@ -220,6 +230,13 @@ func (handler *DBHandler) GetName(id int) (string, error) {
 	var name string
 	err := handler.Db.QueryRow(query, id).Scan(&name)
 	return name, err
+}
+
+func (handler *DBHandler) GetEmail(name string) (string, error) {
+	query := "SELECT name FROM users WHERE name = ?"
+	var email string
+	err := handler.Db.QueryRow(query, name).Scan(&email)
+	return email, err
 }
 
 func (handler *DBHandler) GetMedalRank() (map[string]int, error) {
