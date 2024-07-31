@@ -233,7 +233,7 @@ func (handler *DBHandler) GetName(id int) (string, error) {
 }
 
 func (handler *DBHandler) GetEmail(name string) (string, error) {
-	query := "SELECT name FROM users WHERE name = ?"
+	query := "SELECT email FROM users WHERE name = ?"
 	var email string
 	err := handler.Db.QueryRow(query, name).Scan(&email)
 	return email, err
