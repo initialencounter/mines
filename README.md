@@ -11,9 +11,7 @@
 ## 工作原理
 
 后端负责扫雷的逻辑以及用户的管理
-玩家首次打开网页需要输入账号和密码，默认账号密码是
-
-账号:`john` 密码:`doe`
+玩家首次打开网页需要注册
 
 前端负责展示游戏界面以及与后端的交互
 前后端交互采用 http + websocket 的方式通信
@@ -26,15 +24,24 @@
 
 前往 [GitHub Action](https://github.com/initialencounter/mines/actions/runs/9763654252) 下载编译好的二进制文件，然后运行即可
 
+如需配置密码重置系统，则需要在 `config.yml` 在配置 smtp 服务器
+
+```yaml
+smtp:
+  host: "smtp.example.com" # smtp 服务器 host
+  port: "587" #smtp端口
+  tls: true #是否启用 tls
+  username: "your email address" #填写邮箱地址
+  password: "your password" #填写密码或授权码, 一般都需要授权码，授权码可以到邮箱后台获取
+```
+
+
 ## TODO
 
 目前还有很多功能没有实现，例如
 
-- 排行榜
 - 成绩计算分析
 - 扫雷道具
-- 后端数据库
-- 等等
 
 欢迎大家来给我提 PR 呀
 [开源地址](https://github.com/initialencounter/mines)
