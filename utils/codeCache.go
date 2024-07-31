@@ -35,7 +35,7 @@ func GenerateCode() (CacheEntry, error) {
 	}
 	code := int(b[0])<<16 + int(b[1])<<8 + int(b[2])
 	return CacheEntry{
-		Code:         fmt.Sprintf("%06d", code),
+		Code:         fmt.Sprintf("%06d", code%1000000),
 		CreationTime: time.Now()}, nil
 }
 
