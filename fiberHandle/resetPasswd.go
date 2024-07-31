@@ -8,6 +8,7 @@ import (
 
 type ResetPasswordRequest struct {
 	User string `json:"user"`
+	Pass string `json:"pass"`
 	Code string `json:"code"`
 }
 
@@ -19,19 +20,18 @@ func ResetPassword(handler *database.DBHandler, c *fiber.Ctx, codeCache *utils.C
 
 	userName := req.User
 	code := req.Code
-	entry, found := codeCache.Get(userName)
-	if !found {
-		return c.Status(fiber.StatusBadRequest).SendString("Invalid user")
+	pass := req.Pass
+	if res, _ := handler.NameExists(userName); !res {
+		return fiber.NewError(fiber.StatusUnauthorized, "User not found")
 	}
-	if entry.Code != code {
+	entry, found := codeCache.Get(userName)
+	if !found || entry.Code != code || utils.IsCodeExpired(entry.CreationTime) {
 		return c.Status(fiber.StatusBadRequest).SendString("Invalid code")
 	}
-	if utils.IsCodeExpired(entry.CreationTime) {
-		return c.Status(fiber.StatusBadRequest).SendString("Code expired")
-	}
-	err := handler.ChangePasswordByName(userName, code)
+	err := handler.ChangePasswordByName(userName, pass)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Failed to change password")
 	}
+	codeCache.Delete(userName)
 	return c.Status(fiber.StatusOK).SendString("Code valid")
 }

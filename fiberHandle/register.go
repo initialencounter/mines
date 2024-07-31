@@ -28,7 +28,15 @@ func Register(handler *database.DBHandler, c *fiber.Ctx) error {
 	if res, _ := handler.NameExists(user); res {
 		return fiber.NewError(fiber.StatusConflict, "User already exists")
 	}
-	fmt.Println(user, pass, email)
+
+	if VerifyUserName(user) {
+		return fiber.NewError(fiber.StatusBadRequest, "The user name cannot contain special characters")
+	}
+
+	if valid, reason := VerifyEmail(email); !valid {
+		return fiber.NewError(fiber.StatusBadRequest, reason)
+	}
+
 	err := handler.InsertRecord(user, pass, email, 0)
 	if err != nil {
 		fmt.Println(err)

@@ -29,12 +29,13 @@
             <el-input v-model="ruleForm.email"/>
           </el-form-item>
           <el-form-item v-if="modes.reset" label="验证码" prop="code">
-            <el-input v-model="ruleForm.checkPass" type="password"/>
+            <el-input v-model="ruleForm.code"/>
           </el-form-item>
           <el-form-item>
             <div class="config-button">
-              <el-button type="primary" @click="submitForm(ruleFormRef)">
-                {{ modes.register ? "注册" : (modes.login ? "登录" : "发送验证码") }}
+              <el-button v-if="modes.verify" type="primary" @click="submitForm(ruleFormRef)">发送验证码</el-button>
+              <el-button v-if="!modes.verify" type="primary" @click="submitForm(ruleFormRef)">
+                {{ modes.register ? "注册" : (modes.login ? "登录" : "重置密码") }}
               </el-button>
               <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
             </div>
@@ -59,7 +60,14 @@ import {reactive, ref} from 'vue'
 import axios from "axios";
 import {host, port} from "@/utils";
 
-import {type ComponentSize, ElMessage, ElNotification, type FormInstance, type FormRules} from 'element-plus'
+import {
+  type ComponentSize,
+  ElMessage,
+  ElMessageBox,
+  ElNotification,
+  type FormInstance,
+  type FormRules
+} from 'element-plus'
 
 const modes = ref<{ login: boolean, register: boolean, reset: boolean, verify: boolean }>({login: true, register: false, reset: false, verify: false})
 type Mode = 'login' | 'register' | 'reset' | 'verify'
@@ -85,6 +93,16 @@ const ruleForm = reactive<RuleForm>({
   code: '',
 })
 
+const validatePass = (rule: any, value: string, callback: any) => {
+  if (value === '') {
+    callback(new Error('请再次输入密码！'))
+  } else if (value !== ruleForm.password) {
+    callback(new Error('两次输入密码不一致！'))
+  } else {
+    callback()
+  }
+}
+
 const rules = reactive<FormRules<RuleForm>>({
   userName: [
     {required: true, message: '请输入用户名！', trigger: 'blur'},
@@ -95,7 +113,7 @@ const rules = reactive<FormRules<RuleForm>>({
     {min: 1, max: 16, message: '长度应该为 1 - 16', trigger: 'blur'},
   ],
   checkPass: [
-    {required: true, message: '请输入再次密码！', trigger: 'blur'},
+    {required: true, validator: validatePass, trigger: 'blur'},
     {min: 1, max: 16, message: '长度应该为 1 - 16', trigger: 'blur'},
   ],
   email: [
@@ -112,24 +130,8 @@ const submitForm = async (formEl: FormInstance | undefined) => {
   if (!formEl) return
   await formEl.validate((valid) => {
     if (valid) {
-      if (modes.value.register)
-        register()
-      else if(modes.value.login){
-        login()
-      }else if(modes.value.reset){
-        ElMessage({
-          message: '找回密码功能暂未开放！',
-          type: 'warning',
-          plain: true,
-        })
-      }
-      else {
-        ElMessage({
-          message: '验证功能暂未开放！',
-          type: 'warning',
-          plain: true,
-        })
-      }
+      let mode = modes.value.register ? 'register' : (modes.value.login ? 'login' : (modes.value.verify ? 'verify' : 'reset'))
+      postForm(mode as Mode)
     } else {
       ElMessage.error('error submit!')
     }
@@ -141,13 +143,13 @@ const resetForm = (formEl: FormInstance | undefined) => {
   formEl.resetFields()
 }
 
-async function login() {
+async function postForm(mode: Mode) {
   loading.value = true
-  const {userName: userName, password} = ruleForm
+  const {userName, password, email, code} = ruleForm
   try {
     let config = {
       method: 'post',
-      url: `http://${host}:${port}/login`,
+      url: `http://${host}:${port}/${mode}`,
       headers: {
         'Content-Type': 'application/json',
         'Accept': '*/*',
@@ -155,79 +157,52 @@ async function login() {
       data: {
         user: userName,
         pass: password,
-      }
-    };
-    const response = await axios(config);
-    loading.value = false
-    ElMessage({
-      message: `${userName}，欢迎回来！`,
-      type: 'success',
-      plain: true,
-    })
-    showLogin.value = false
-    const token = response.data.token;
-    localStorage.setItem('jwt', '20240704' + token);
-    localStorage.setItem('userId', response.data.id);
-    localStorage.setItem('userName', userName)
-  } catch (error: any) {
-    loading.value = false
-    ElNotification({
-      title: 'Error',
-      message: error.response.data,
-      type: 'error',
-      duration: 0,
-    })
-  }
-}
-
-const register = async () => {
-  loading.value = true
-  const {userName, password, email} = ruleForm
-  if (password !== ruleForm.checkPass) {
-    ElMessage.error('两次密码不一致！')
-    return
-  }
-  try {
-    let config = {
-      method: 'post',
-      url: `http://${host}:${port}/register`,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': '*/*',
-      },
-      data: {
-        user: userName,
-        pass: password,
+        code: code,
         email: email
       }
     };
     const response = await axios(config);
     loading.value = false
+    let messageText = mode === 'login' ? `欢迎回来，${userName}！` : (mode === 'register' ? `${userName}，欢迎加入！` : response.data)
     ElMessage({
-      message: `${userName}，欢迎加入！`,
+      message: messageText,
       type: 'success',
       plain: true,
     })
-    showLogin.value = false
-    const token = response.data.token;
-    localStorage.setItem('jwt', '20240704' + token);
-    localStorage.setItem('userId', response.data.id);
-    localStorage.setItem('userName', userName)
+    if (mode === 'verify') {
+      switchMode('reset')
+    }
+    if (mode === 'reset') {
+      switchMode('login')
+    }
+    if(mode === 'login'|| mode === 'register') {
+      const token = response.data.token;
+      localStorage.setItem('jwt', '20240704' + token);
+      localStorage.setItem('userId', response.data.id);
+      localStorage.setItem('userName', userName)
+      showLogin.value = false
+    }
   } catch (error: any) {
     loading.value = false
-    ElNotification({
-      title: 'Error',
-      message: error.response.data,
+    await ElMessageBox.alert(error.response.data, 'oops!', {
+      confirmButtonText: 'OK',
       type: 'error',
-      duration: 0,
-    })
+    });
   }
 }
+
 const switchMode = (mode: Mode) => {
   for (const key of Object.keys(modes.value) as Mode[]) {
     modes.value[key] = (key === mode);
   }
 }
+
+document.onkeydown = (e) => {
+  if (e.key === 'Enter') {
+    submitForm(ruleFormRef.value)
+  }
+}
+
 </script>
 
 <style>

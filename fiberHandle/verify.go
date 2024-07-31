@@ -2,10 +2,16 @@ package fiberHandle
 
 import (
 	"fmt"
+	emailverifier "github.com/AfterShip/email-verifier"
 	"github.com/gofiber/fiber/v2"
 	"main/database"
 	"main/smtp"
 	"main/utils"
+	"regexp"
+)
+
+var (
+	emailVerifier = emailverifier.NewVerifier()
 )
 
 type ForgotPasswordRequest struct {
@@ -13,7 +19,7 @@ type ForgotPasswordRequest struct {
 	Email string `json:"email"`
 }
 
-func ForgotPassword(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailConfig, codeCache *utils.CodeCache) error {
+func VerifyCode(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailConfig, codeCache *utils.CodeCache) error {
 	var req ForgotPasswordRequest
 	if err := c.BodyParser(&req); err != nil {
 		return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
@@ -30,7 +36,6 @@ func ForgotPassword(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailC
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Failed to get email")
 	}
-
 	if getEmail != email {
 		return c.Status(fiber.StatusBadRequest).SendString("Email does not match")
 	}
@@ -42,7 +47,6 @@ func ForgotPassword(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailC
 
 	codeCache.Set(userName, code.Code, code.CreationTime)
 	var conn = smtp.NewSMTP(config)
-
 	var sendOptions = smtp.SendOptions{
 		To:      []string{email},
 		Subject: "[MineSweeper] Reset Password",
@@ -53,4 +57,20 @@ func ForgotPassword(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailC
 		return c.Status(fiber.StatusInternalServerError).SendString("Failed to send email")
 	}
 	return c.Status(fiber.StatusOK).SendString("Email sent")
+}
+
+func VerifyEmail(email string) (bool, string) {
+	ret, err := emailVerifier.Verify(email)
+	if err != nil {
+		return false, "verify email address failed, error is: " + err.Error()
+	}
+	if !ret.Syntax.Valid {
+		return false, "email address syntax is invalid"
+	}
+	return true, ""
+}
+
+func VerifyUserName(username string) bool {
+	re := regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
+	return !re.MatchString(username)
 }

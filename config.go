@@ -44,7 +44,10 @@ func getConfig() Config {
 	// 添加配置文件路径
 	viper.AddConfigPath(".") // 表示当前目录
 	configFile := "config.yml"
-
+	if fileExists("config-test.yml") {
+		configFile = "config-test.yml"
+	}
+	fmt.Println("Using config file:", configFile)
 	// 检查配置文件是否存在
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
 		fmt.Println("Config file not found, creating default config.yml\n配置文件不存在，创建默认配置文件 config.yml")
@@ -78,6 +81,7 @@ smtp:
 		}
 		fmt.Println("Default config.yml created")
 	}
+	viper.SetConfigFile(configFile)
 	// 读取配置文件
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatalf("Error reading config file, %s", err)
@@ -91,4 +95,12 @@ smtp:
 	}
 
 	return config
+}
+
+func fileExists(filename string) bool {
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }

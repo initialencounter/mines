@@ -54,6 +54,12 @@ func (c *CodeCache) Get(userName string) (CacheEntry, bool) {
 	return entry, found
 }
 
+func (c *CodeCache) Delete(userName string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.data, userName)
+}
+
 // IsCodeExpired 检查验证码是否过期
 func IsCodeExpired(creationTime time.Time) bool {
 	return time.Since(creationTime) > 120*time.Minute
