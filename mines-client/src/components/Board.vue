@@ -50,6 +50,7 @@ const userName = localStorage.getItem('userName')
 const scoreBoard = ref<ScoreBoardType>({})
 const totalScoreBoard = ref<ScoreBoardType>({})
 const scoreTip = ref<InstanceType<typeof ScoreTip>>()
+const isEnd = ref(false)
 const openSound = new Howl({
   src: ['/src/assets/audio/open.mp3'],
   volume: 0.5
@@ -199,6 +200,9 @@ const handleClick = (event: MouseEvent, index: number) => {
   let now = new Date().getTime()
   if (!timer) {
     timer = true
+    if(isEnd.value){
+      return
+    }
     intervalFlag = setInterval(() => {
       let now1 = new Date().getTime()
       timeWatcher.value = msToTime(now1 - startTimeStamp)
@@ -316,6 +320,7 @@ ws.onmessage = async (event) => {
       clearInterval(intervalFlag)
       timer = false
     }
+    isEnd.value = true
     let confirm = await ElMessageBox.confirm(
         `${decodeURIComponent(data.UserName)}结束了比赛！用时：${msToTime(data.TimeStamp - data.StartTimeStamp)}，再来一局？`,
         'Success',
@@ -326,6 +331,7 @@ ws.onmessage = async (event) => {
         }
     )
     if (confirm === 'confirm') {
+      isEnd.value = false
       await getNewGame()
       await getBoard()
     }

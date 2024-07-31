@@ -176,13 +176,29 @@ func main() {
 				}
 				nameCache.Set(id, userName)
 			}
-			result := m.openCells(message.Ids)
+			var result = m.openCells(message.Ids)
+			var timeStamp = message.TimeStamp
+			if m.IsWind {
+				result = ChangeCell{
+					Result: Result{
+						IsWin:       true,
+						IsBoom:      false,
+						RemainCells: 0,
+						Message:     "You Win!",
+					},
+					Cell: []Cell{},
+				}
+				if m.EndTimeStamp == 0 {
+					m.EndTimeStamp = timeStamp
+				}
+				timeStamp = m.EndTimeStamp
+			}
 			earnScore := scoreCalculator(message, result)
 
 			var response = Response{
 				NewPlayer:      newPlayer,
 				ChangeCell:     result,
-				TimeStamp:      message.TimeStamp,
+				TimeStamp:      timeStamp,
 				StartTimeStamp: m.StartTimeStamp,
 				EarnScore:      earnScore,
 			}

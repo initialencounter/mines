@@ -23,6 +23,8 @@ type Minefield struct {
 	Cell           Cells
 	First          bool
 	StartTimeStamp int64
+	EndTimeStamp   int64
+	IsWind         bool
 }
 type Result struct {
 	IsWin       bool
@@ -228,6 +230,7 @@ func (m *Minefield) getStats(id int) Result {
 	}
 	if RemainCells == m.Cells-m.Mines {
 		isWin = true
+		m.IsWind = true
 	}
 	if m.Cell[id].IsMine && m.Cell[id].IsOpen {
 		isBoom = true
