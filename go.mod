@@ -3,6 +3,7 @@ module main
 go 1.22.4
 
 require (
+	github.com/AfterShip/email-verifier v1.4.0
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gofiber/contrib/websocket v1.3.1
 	github.com/gofiber/fiber/v2 v2.52.4
@@ -12,7 +13,6 @@ require (
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/AfterShip/email-verifier v1.4.0 // indirect
 	github.com/andybalholm/brotli v1.1.0 // indirect
 	github.com/fasthttp/websocket v1.5.8 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
