@@ -38,6 +38,7 @@
                 {{ modes.register ? "注册" : (modes.login ? "登录" : "重置密码") }}
               </el-button>
               <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
+              <el-button type="info" @click="visitorModeLogin">游客模式</el-button>
             </div>
           </el-form-item>
           <el-form-item>
@@ -201,6 +202,12 @@ document.onkeydown = (e) => {
   if (e.key === 'Enter') {
     submitForm(ruleFormRef.value)
   }
+}
+
+const visitorModeLogin = () => {
+  ruleForm.userName = 'visitor'
+  ruleForm.password = 'visitor'
+  postForm('login')
 }
 
 </script>

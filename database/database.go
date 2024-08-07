@@ -41,6 +41,10 @@ func (handler *DBHandler) CreateTable() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var exists, _ = handler.NameExists("visitor")
+	if !exists {
+		handler.InsertRecord("visitor", "visitor", "", 0)
+	}
 	fmt.Println("Table created or already exists.")
 }
 
