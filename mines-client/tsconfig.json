@@ -10,5 +10,6 @@
     {
       "path": "./tsconfig.app.json"
     }
-  ]
+  ],
+  "include": ["shims-vue.d.ts"],
 }

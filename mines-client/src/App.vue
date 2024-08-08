@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import Login from '@/components/Login.vue';
 import Board from '@/components/Board.vue';
+import Footer from "@/components/Footer.vue";
 import {ref} from "vue";
 
 const jwt = localStorage.getItem('jwt')?.replace('20240704', '')
@@ -23,8 +24,19 @@ const showLogin = ref<boolean>(isExpired(jwt))
         <Board v-if="!showLogin" v-model="showLogin"></Board>
         <Login v-if="showLogin" v-model="showLogin"></Login>
       </el-main>
-      <el-footer></el-footer>
+      <el-footer>
+        <Footer></Footer>
+      </el-footer>
     </el-container>
   </div>
 
 </template>
+
+<style>
+  .common-layout {
+    height: 100vh;
+    justify-content: center;
+    display: block;
+    margin:auto;
+  }
+</style>
