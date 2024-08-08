@@ -8,10 +8,9 @@
                  :model="ruleForm"
                  :rules="rules"
                  :size="formSize"
-                 class="demo-ruleForm"
                  label-width="auto"
                  status-icon
-                 style="max-width: 500px"
+                 style="max-width: 24rem"
         >
           <el-form-item>
             <h1>{{ modes.register ? "注册模式" : (modes.login ? "亲，请登录" : "找回密码，若忘记用户名，请联系管理员！") }}</h1>
@@ -37,15 +36,12 @@
               <el-button v-if="!modes.verify" type="primary" @click="submitForm(ruleFormRef)">
                 {{ modes.register ? "注册" : (modes.login ? "登录" : "重置密码") }}
               </el-button>
-              <el-button type="danger" @click="resetForm(ruleFormRef)">清除输入</el-button>
-              <el-button type="info" @click="visitorModeLogin">游客模式</el-button>
-            </div>
-          </el-form-item>
-          <el-form-item>
-            <div class="config-button">
-              <el-button v-if="!modes.login" type="primary" @click="switchMode('login')">已有账号！点我登录！</el-button>
-              <el-button v-if="!modes.register" type="primary" @click="switchMode('register')">没有账号！点我注册！</el-button>
-              <el-button v-if="!modes.verify && !modes.reset" type="primary" @click="switchMode('verify')">忘记密码！点我找回！</el-button>
+              <el-button type="danger" @click="resetForm(ruleFormRef)">清空</el-button>
+              <el-button type="info" @click="visitorModeLogin">游客</el-button>
+              <p></p>
+              <el-button v-if="!modes.login" type="primary" @click="switchMode('login')">登录</el-button>
+              <el-button v-if="!modes.register" type="primary" @click="switchMode('register')">注册</el-button>
+              <el-button v-if="!modes.verify && !modes.reset" type="primary" @click="switchMode('verify')">忘记密码</el-button>
             </div>
           </el-form-item>
         </el-form>
@@ -65,7 +61,6 @@ import {
   type ComponentSize,
   ElMessage,
   ElMessageBox,
-  ElNotification,
   type FormInstance,
   type FormRules
 } from 'element-plus'
@@ -216,8 +211,9 @@ const visitorModeLogin = () => {
 
 .el-form {
   background: rgba(121, 187, 255, 0.18);
-  padding: 5rem;
-  margin: 5rem;
+  padding: 2rem;
+  display: block;
+  margin:auto;
   border-radius: 0.8rem;
 }
 
@@ -226,8 +222,7 @@ const visitorModeLogin = () => {
 }
 
 .config-button {
-  left: 20%;
-  display: flex;
-  justify-content: center;
+  display: block;
+  margin:auto;
 }
 </style>
