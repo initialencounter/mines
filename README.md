@@ -1,4 +1,5 @@
 # mines
+
 多人扫雷服务器
 
 [即刻体验](http://14.103.48.1:2330/)
@@ -18,7 +19,7 @@
 
 登录，获取地图信息采用 http 请求
 
-扫雷地图会通过服务端websocket来更新，玩家的操作也会通过websocket来传递给服务端
+扫雷地图会通过服务端 websocket 来更新，玩家的操作也会通过 websocket 来传递给服务端
 
 ## 部署
 
@@ -34,7 +35,6 @@ smtp:
   username: "your email address" #填写邮箱地址
   password: "your password" #填写密码或授权码, 一般都需要授权码，授权码可以到邮箱后台获取
 ```
-
 
 ## TODO
 
