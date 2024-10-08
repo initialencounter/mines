@@ -4,17 +4,18 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/gofiber/contrib/websocket"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"github.com/golang-jwt/jwt/v5"
 	"log"
 	"main/database"
 	"main/fiberHandle"
 	"main/utils"
 	"net/http"
 	"strconv"
+
+	"github.com/gofiber/contrib/websocket"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/filesystem"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 // 嵌入 mines-client/dist 目录中的所有文件
@@ -85,13 +86,9 @@ func main() {
 	})
 
 	app.Post("/newGame", func(c *fiber.Ctx) error {
-		stats := m.getStats(0)
-		if stats.IsWin {
-			m = newMinefield(config.Mine.Mines, config.Mine.Width, config.Mine.Height)
-			return c.JSON(fiber.Map{"result": "ok"})
-		} else {
-			return c.JSON(fiber.Map{"result": "fail"})
-		}
+		clearScoreBoard(scoreBoard, handler, nameCache)
+		m = newMinefield(config.Mine.Mines, config.Mine.Width, config.Mine.Height)
+		return c.JSON(fiber.Map{"result": "ok"})
 	})
 
 	app.Use("/ws", func(c *fiber.Ctx) error {
@@ -214,14 +211,7 @@ func main() {
 				fmt.Println(err)
 			}
 			if result.Result.IsWin {
-				for name, score := range scoreBoard.Board {
-					userId, _ := nameCache.GetId(name)
-					err := handler.AddMedal(userId, score)
-					if err != nil {
-						return
-					}
-				}
-				scoreBoard.clear()
+				clearScoreBoard(scoreBoard, handler, nameCache)
 			}
 			pool.BroadcastMessage(jsonData)
 			newPlayer = false

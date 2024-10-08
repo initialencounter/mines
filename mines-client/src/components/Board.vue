@@ -12,6 +12,7 @@
       @click="flagMode = !flagMode"
       >{{ flagMode ? "标记" : "挖开" }}模式
     </el-button>
+    <el-button class="logout-button" style="width: 5rem" @click="reset">重置</el-button>
     <ScoreTip ref="scoreTip" class="scoreTipParent"></ScoreTip>
   </div>
   <div
@@ -226,6 +227,10 @@ const sendOpenList = async (openList: number[], now: number) => {
 let timer = false;
 let intervalFlag: number;
 const handleClick = (event: MouseEvent, index: number) => {
+  if (event.button === 1) {
+    reset();
+    return
+  }
   let now = new Date().getTime();
   if (!timer) {
     timer = true;
@@ -361,9 +366,7 @@ ws.onmessage = async (event) => {
       }
     );
     if (confirm === "confirm") {
-      isEnd.value = false;
-      await getNewGame();
-      await getBoard();
+      reset();
     }
   }
 };
@@ -372,6 +375,12 @@ function logout() {
   localStorage.removeItem("jwt");
   localStorage.removeItem("userId");
   showLogin.value = true;
+}
+
+async function reset() {
+  isEnd.value = false;
+  await getNewGame();
+  await getBoard();
 }
 </script>
 

@@ -1,5 +1,10 @@
 package main
 
+import (
+	"main/database"
+	"main/utils"
+)
+
 type Board = map[string]int
 type Player struct {
 	Name  string
@@ -55,4 +60,15 @@ func scoreCalculator(message Request, result ChangeCell) int {
 			return len(result.Cell)
 		}
 	}
+}
+
+func clearScoreBoard(board *ScoreBoard, handler *database.DBHandler, nameCache *utils.NameCache) {
+	for name, score := range board.Board {
+		userId, _ := nameCache.GetId(name)
+		err := handler.AddMedal(userId, score)
+		if err != nil {
+			return
+		}
+	}
+	scoreBoard.clear()
 }
