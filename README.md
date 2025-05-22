@@ -2,7 +2,7 @@
 
 多人扫雷服务器
 
-[即刻体验](http://14.103.48.1:2330/)
+[即刻体验](http://mines.initenc.cn/)
 
 ## 项目架构
 
@@ -43,5 +43,4 @@ smtp:
 - 成绩计算分析
 - 扫雷道具
 
-欢迎大家来给我提 PR 呀
 [开源地址](https://github.com/initialencounter/mines)
