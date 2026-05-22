@@ -145,7 +145,7 @@ async function postForm(mode: Mode) {
   try {
     let config = {
       method: 'post',
-      url: `http://${host}:${port}/${mode}`,
+      url: `//${host}:${port}/${mode}`,
       headers: {
         'Content-Type': 'application/json',
         'Accept': '*/*',

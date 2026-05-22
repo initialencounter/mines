@@ -82,7 +82,7 @@ const flagMode = ref(false);
 const getRank = async () => {
   let config = {
     method: "post",
-    url: `http://${host}:${port}/getRank`,
+    url: `//${host}:${port}/getRank`,
     headers: {
       "Content-Type": "application/xml",
       Accept: "*/*",
@@ -92,13 +92,13 @@ const getRank = async () => {
 };
 
 const reConnect = () => {
-  return new WebSocket(`ws://${host}:${port}/ws/${userId}?token=${token}`);
+  return new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${host}:${port}/ws/${userId}?token=${token}`);
 };
 
 const getBoard = async () => {
   let config = {
     method: "post",
-    url: `http://${host}:${port}/getMinefield`,
+    url: `//${host}:${port}/getMinefield`,
     headers: {
       "Content-Type": "application/xml",
       Accept: "*/*",
@@ -111,7 +111,7 @@ const getBoard = async () => {
 const getNewGame = async () => {
   let config = {
     method: "post",
-    url: `http://${host}:${port}/newGame`,
+    url: `//${host}:${port}/newGame`,
     headers: {
       "Content-Type": "application/xml",
       Accept: "*/*",
