@@ -10,9 +10,16 @@ function onLogin(data: { token: string; id: number; name: string }) {
   token.value = data.token
   isLoggedIn.value = true
 }
+
+function onLogout() {
+  localStorage.removeItem('token')
+  localStorage.removeItem('uid')
+  token.value = ''
+  isLoggedIn.value = false
+}
 </script>
 
 <template>
   <LoginDialog v-if="!isLoggedIn" @login="onLogin" />
-  <Board v-else :key="token" />
+  <Board v-else :key="token" @logout="onLogout" />
 </template>

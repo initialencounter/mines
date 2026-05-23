@@ -21,6 +21,7 @@ import ScoreTip from '@/components/ScoreTip.vue'
 interface Action { a: number, r: number, c: number }
 
 // ========== 常量 ==========
+const emit = defineEmits<{ logout: [] }>()
 const cellSize = 24
 const COOLDOWN_PER_ERROR = 0.5
 const MAX_HINTS = 5
@@ -856,6 +857,12 @@ function getRankIcon(rank: number) {
   return ''
 }
 
+// ========== 退出登录 ==========
+function doLogout() {
+  cleanup()
+  emit('logout')
+}
+
 // ========== 重置 ==========
 async function reset() {
   cleanup()
@@ -946,6 +953,10 @@ async function reset() {
 
       <el-button class="cursor-mode-button" @click="togglePlayerCursorMode">
         {{ playerCursorMode === 'full' ? '👤 玩家' : playerCursorMode === 'avatar' ? '👤 仅头像' : '👤 隐藏' }}
+      </el-button>
+
+      <el-button type="danger" style="width: auto" @click="doLogout">
+        退出登录
       </el-button>
 
       <el-button v-if="hasProp(101)" :style="{ width: 'auto', background: usingPropId === 101 ? '#faad14' : '' }" @click="startUseProp(101)">
