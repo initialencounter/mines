@@ -159,11 +159,41 @@ func main() {
 		pool.Set(id, c)
 		log.Println("New WebSocket connection added")
 
+		// Send initial state to the new player
+		userName, err := handler.GetName(id)
+		if err != nil {
+			log.Println("Failed to get username:", err)
+			return
+		}
+		nameCache.Set(id, userName)
+
+		initMinefield := m.openMinefield()
+		initMsg := InitMessage{
+			MessageType:    "init",
+			Minefield:      initMinefield,
+			ScoreBoard:     scoreBoard.Board,
+			StartTimeStamp: m.StartTimeStamp,
+			SafeCells:      m.RemainCells(),
+			UserName:       userName,
+		}
+		if initBytes, err := json.Marshal(initMsg); err == nil {
+			pool.SendToPlayer(id, initBytes)
+		}
+
+		// Broadcast new player join to others
+		joinMsg := Response{
+			NewPlayer: true,
+			UserName:  userName,
+		}
+		if joinBytes, err := json.Marshal(joinMsg); err == nil {
+			pool.BroadcastExcept(id, joinBytes)
+		}
+
 		var (
 			msg []byte
 		)
 		log.Println(c.Params("id"))
-		var newPlayer = true
+		var newPlayer = false
 		for {
 			if _, msg, err = c.ReadMessage(); err != nil {
 				log.Println("read:", err)
@@ -187,6 +217,8 @@ func main() {
 			// Route by ActionType
 			var response Response
 			switch message.ActionType {
+			case "hint":
+				response = handleHint(&m, message, id, playerState)
 			case "useDetector":
 				response = handleUseDetector(&m, message, id, playerState, &config)
 			case "useXJBD":
@@ -196,7 +228,11 @@ func main() {
 				response = handleNormalAction(&m, message, id, playerState, &config, handler, newPlayer)
 			}
 
-			if message.ActionType == "useDetector" {
+			if message.ActionType == "hint" {
+				if jsonData, err := json.Marshal(response); err == nil {
+					pool.SendToPlayer(id, jsonData)
+				}
+			} else if message.ActionType == "useDetector" {
 				// Detector: send mine positions only to the acting player
 				// Broadcast propEffect notification to all others
 				if response.PropEffect != nil {
@@ -354,6 +390,7 @@ func handleUseXJBD(m *Minefield, message Request, playerID int, ps *utils.Player
 		TimeStamp:      timeStamp,
 		StartTimeStamp: m.StartTimeStamp,
 		EarnScore:      earnScore,
+		SafeCells:      m.RemainCells(),
 		PropBarUpdate:  buildPropBarUpdate(ps),
 		PropEffect: &PropEffectInfo{
 			PropID:     PropXJBD,
@@ -409,7 +446,7 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 	}
 
 	// Shield protection check for mine hit
-	if result.Result.IsBoom && message.ActionType == "" {
+	if result.Result.IsBoom && message.ActionType == "" && !message.IsFlag {
 		if ps.ConsumeShield() {
 			// Shield absorbed the hit — revert the mine cell
 			for i := range result.Cell {
@@ -446,6 +483,9 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 	if message.IsFlag && !result.Result.IsBoom && len(result.Cell) > 0 {
 		flaggedCell := m.Cell[message.Ids[0]]
 		if !flaggedCell.IsMine && ps.ConsumeShield() {
+			// Shield absorbed the wrong flag — revert the cell
+			m.Cell[message.Ids[0]].IsOpen = false
+			result.Cell[0].IsOpen = false
 			shieldCount := ps.GetShieldCount()
 			userName, _ := nameCache.GetName(playerID)
 
@@ -513,6 +553,7 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 	response.TimeStamp = timeStamp
 	response.StartTimeStamp = m.StartTimeStamp
 	response.EarnScore = earnScore
+	response.SafeCells = m.RemainCells()
 	response.PropBarUpdate = buildPropBarUpdate(ps)
 	response.ZoneInfo = m.zoneToZoneData()
 
@@ -529,11 +570,26 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 
 func buildPropBarUpdate(ps *utils.PlayerState) *PropBarUpdate {
 	inventory := ps.GetInventory()
+	doubleScoreActive := ps.IsDoubleScoreActive()
+	doubleRemaining := ps.GetDoubleScoreRemaining()
+	shieldCount := ps.GetShieldCount()
+
 	slots := make([]PropSlot, 0)
 	for propID, count := range inventory {
 		def, ok := PropDefs[propID]
 		if !ok {
 			continue
+		}
+		// Double score: only show in inventory while effect is active
+		if propID == PropDoubleScore && !doubleScoreActive {
+			continue
+		}
+		// Shield: sync inventory count with actual ShieldCount
+		if propID == PropShield {
+			count = shieldCount
+			if count <= 0 {
+				continue
+			}
 		}
 		slots = append(slots, PropSlot{
 			PropID: propID,
@@ -541,9 +597,6 @@ func buildPropBarUpdate(ps *utils.PlayerState) *PropBarUpdate {
 			Count:  count,
 		})
 	}
-	doubleScoreActive := ps.IsDoubleScoreActive()
-	doubleRemaining := ps.GetDoubleScoreRemaining()
-	shieldCount := ps.GetShieldCount()
 
 	return &PropBarUpdate{
 		Inventory:            slots,
@@ -559,5 +612,37 @@ func buildPropCounts(config PropConfig) map[int]int {
 		PropXJBD:        config.XJBDCount,
 		PropDoubleScore: config.DoubleScoreCount,
 		PropShield:      config.ShieldCount,
+	}
+}
+
+func handleHint(m *Minefield, message Request, playerID int, ps *utils.PlayerState) Response {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	userName, _ := nameCache.GetName(playerID)
+
+	// Find a random unopened, non-mine cell
+	var safeCells []int
+	for i := 0; i < m.Cells; i++ {
+		if !m.Cell[i].IsOpen && !m.Cell[i].IsFlagged && !m.Cell[i].IsMine {
+			safeCells = append(safeCells, i)
+		}
+	}
+	if len(safeCells) == 0 {
+		return Response{
+			UserName:    userName,
+			MessageType: "hintResult",
+			ChangeCell:  ChangeCell{Cell: []Cell{}},
+		}
+	}
+
+	hintID := safeCells[time.Now().UnixNano()%int64(len(safeCells))]
+
+	return Response{
+		UserName:    userName,
+		MessageType: "hintResult",
+		ChangeCell: ChangeCell{
+			Cell: []Cell{{Id: hintID}},
+		},
 	}
 }

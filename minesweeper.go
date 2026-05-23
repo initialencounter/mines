@@ -23,6 +23,13 @@ const (
 	ZoneNoFlag      ZoneType = 1
 )
 
+func (z ZoneType) MarshalJSON() ([]byte, error) {
+	if z == ZoneNoFlag {
+		return []byte(`"noFlag"`), nil
+	}
+	return []byte(`"doubleScore"`), nil
+}
+
 type Zone struct {
 	StartRow int      `json:"StartRow"`
 	StartCol int      `json:"StartCol"`
@@ -104,6 +111,15 @@ type ZoneData struct {
 	Type     string `json:"Type"`
 }
 
+type InitMessage struct {
+	MessageType    string         `json:"MessageType"`
+	Minefield      Minefield      `json:"Minefield"`
+	ScoreBoard     map[string]int `json:"ScoreBoard"`
+	StartTimeStamp int64          `json:"StartTimeStamp"`
+	SafeCells      int            `json:"SafeCells"`
+	UserName       string         `json:"UserName"`
+}
+
 type PropEffectInfo struct {
 	PropID     int    `json:"PropID"`
 	UserName   string `json:"UserName"`
@@ -125,6 +141,7 @@ type Response struct {
 	StartTimeStamp int64           `json:"StartTimeStamp"`
 	EarnScore      int             `json:"EarnScore"`
 	ScoreBoard     map[string]int  `json:"ScoreBoard"`
+	SafeCells      int             `json:"SafeCells,omitempty"`
 
 	// New optional fields for prop system
 	MessageType    string          `json:"MessageType,omitempty"`
@@ -531,6 +548,17 @@ func (m *Minefield) getStats(id int) Result {
 		m.IsWind = true
 	}
 	return Result{isWin, isBoom, RemainCells, "ok"}
+}
+
+// RemainCells returns the count of unopened safe cells (not mines)
+func (m *Minefield) RemainCells() int {
+	count := 0
+	for i := 0; i < m.Cells; i++ {
+		if !m.Cell[i].IsOpen && !m.Cell[i].IsMine {
+			count++
+		}
+	}
+	return count
 }
 
 func (m *Minefield) zoneToZoneData() []ZoneData {

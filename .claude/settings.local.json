@@ -1,7 +1,17 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Read(//c/Users/29115/dev/tapsss/fast-vite-electron/**)",
+      "Bash(go build *)",
+      "Bash(cp -r \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/themes/wom/\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/public/themes/wom/\")",
+      "Bash(cp -r \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/themes/chocolate/\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/public/themes/chocolate/\")",
+      "Bash(cp \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/audio/\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/public/audio/\")",
+      "Bash(cp \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/assets/prop\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/public/assets/\")",
+      "Bash(cp \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/assets/prop\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/src/assets/\")",
+      "Bash(npm install *)",
+      "Bash(npx vue-tsc *)",
+      "Bash(npx vite *)"
     ]
   }
 }
