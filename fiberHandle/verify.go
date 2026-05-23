@@ -2,12 +2,14 @@ package fiberHandle
 
 import (
 	"fmt"
-	emailverifier "github.com/AfterShip/email-verifier"
-	"github.com/gofiber/fiber/v2"
 	"main/database"
+	"main/logger"
 	"main/smtp"
 	"main/utils"
 	"regexp"
+
+	emailverifier "github.com/AfterShip/email-verifier"
+	"github.com/gofiber/fiber/v2"
 )
 
 var (
@@ -46,6 +48,7 @@ func VerifyCode(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailConfi
 	}
 
 	codeCache.Set(userName, code.Code, code.CreationTime)
+	ip := c.IP()
 	var conn = smtp.NewSMTP(config)
 	var sendOptions = smtp.SendOptions{
 		To:      []string{email},
@@ -56,6 +59,7 @@ func VerifyCode(handler *database.DBHandler, c *fiber.Ctx, config smtp.MailConfi
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString("Failed to send email")
 	}
+	logger.Info(ip, "", userName, "FORGOT_PWD", fmt.Sprintf("code sent to %s", email))
 	return c.Status(fiber.StatusOK).SendString("Email sent")
 }
 

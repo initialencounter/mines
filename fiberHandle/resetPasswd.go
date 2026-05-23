@@ -1,9 +1,11 @@
 package fiberHandle
 
 import (
-	"github.com/gofiber/fiber/v2"
 	"main/database"
+	"main/logger"
 	"main/utils"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 type ResetPasswordRequest struct {
@@ -33,5 +35,6 @@ func ResetPassword(handler *database.DBHandler, c *fiber.Ctx, codeCache *utils.C
 		return c.Status(fiber.StatusInternalServerError).SendString("Failed to change password")
 	}
 	codeCache.Delete(userName)
+	logger.Info(c.IP(), "", userName, "RESET_PWD", "SUCCESS")
 	return c.Status(fiber.StatusOK).SendString("Code valid")
 }

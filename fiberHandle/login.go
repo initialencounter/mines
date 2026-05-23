@@ -2,10 +2,12 @@ package fiberHandle
 
 import (
 	"fmt"
+	"main/database"
+	"main/logger"
+	"strings"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"main/database"
-	"strings"
 )
 
 type LoginRequest struct {
@@ -19,6 +21,7 @@ func Login(handler *database.DBHandler, c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
 	}
 
+	ip := c.IP()
 	user := req.User
 	pass := req.Pass
 
@@ -31,20 +34,22 @@ func Login(handler *database.DBHandler, c *fiber.Ctx) error {
 			}
 		}
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Validate the signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fiber.NewError(fiber.StatusUnauthorized, "invalid signing method")
 			}
 			return []byte("secret"), nil
 		})
 		if err != nil || !token.Valid {
+			logger.Warn(ip, "", user, "LOGIN", "FAIL - invalid token")
 			return c.SendStatus(fiber.StatusUnauthorized)
 		}
 	} else {
 		if res, _ := handler.NameExists(user); !res {
+			logger.Warn(ip, "", user, "LOGIN", "FAIL - user not found")
 			return fiber.NewError(fiber.StatusUnauthorized, "User not found or Password does not match")
 		}
 		if res, _ := handler.PasswordMatch(user, pass); !res {
+			logger.Warn(ip, "", user, "LOGIN", "FAIL - password mismatch")
 			return fiber.NewError(fiber.StatusUnauthorized, "User not found or Password does not match")
 		}
 		fmt.Println(user)
@@ -58,5 +63,6 @@ func Login(handler *database.DBHandler, c *fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
+	logger.Info(ip, fmt.Sprintf("%d", id), user, "LOGIN", "SUCCESS")
 	return c.JSON(fiber.Map{"token": t, "id": id})
 }

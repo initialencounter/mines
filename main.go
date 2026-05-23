@@ -7,6 +7,7 @@ import (
 	"log"
 	"main/database"
 	"main/fiberHandle"
+	"main/logger"
 	"main/utils"
 	"net/http"
 	"strconv"
@@ -36,6 +37,11 @@ var playerStates = utils.NewPlayerStateManager()
 
 func main() {
 	var config = getConfig()
+
+	// 初始化日志模块
+	if err := logger.Init(); err != nil {
+		log.Printf("WARN: failed to init logger: %v", err)
+	}
 
 	// 数据库连接
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s", config.Database.User, config.Database.Password, config.Database.Host, config.Database.Port, "mines")
@@ -90,6 +96,7 @@ func main() {
 	})
 
 	app.Post("/newGame", func(c *fiber.Ctx) error {
+		logger.Info(c.IP(), "", "", "NEW_GAME", "game reset")
 		clearScoreBoard(scoreBoard, handler, nameCache)
 		playerStates.ClearAll()
 		zones := generateZones(config.Mine.Width, config.Mine.Height)
@@ -110,6 +117,7 @@ func main() {
 	app.Get("/ws/:id", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
+			c.Locals("clientIP", c.IP())
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
@@ -157,6 +165,13 @@ func handleWebSocket(handler *database.DBHandler, m *Minefield, config *Config) 
 			return
 		}
 		nameCache.Set(id, userName)
+
+		// 获取客户端 IP
+		clientIP := ""
+		if ipVal := c.Locals("clientIP"); ipVal != nil {
+			clientIP = ipVal.(string)
+		}
+		logger.Info(clientIP, userId, userName, "WS_CONNECT", "SUCCESS")
 
 		// 首个玩家连接时，布雷并翻开 4 个零值格子
 		var initChangeCell ChangeCell
@@ -232,6 +247,20 @@ func handleWebSocket(handler *database.DBHandler, m *Minefield, config *Config) 
 				response = handleNormalAction(m, message, id, ps, config, handler, newPlayer)
 			}
 
+			// 记录敏感操作日志
+			switch message.ActionType {
+			case "hint":
+				logger.Info(clientIP, userId, userName, "USE_PROP", "hint")
+			case "useDetector":
+				logger.Info(clientIP, userId, userName, "USE_PROP", fmt.Sprintf("detector at cell %d", message.TargetCell))
+			case "useXJBD":
+				logger.Info(clientIP, userId, userName, "USE_PROP", fmt.Sprintf("XJBD at cell %d", message.TargetCell))
+			default:
+				if response.ChangeCell.Result.IsBoom && !message.IsFlag {
+					logger.Info(clientIP, userId, userName, "MINE_HIT", fmt.Sprintf("cell %v", message.Ids))
+				}
+			}
+
 			// 根据 ActionType 分发响应
 			if message.ActionType == "hint" {
 				if jsonData, err := json.Marshal(response); err == nil {
@@ -294,6 +323,7 @@ func handleWebSocket(handler *database.DBHandler, m *Minefield, config *Config) 
 		}
 
 		// 连接断开清理
+		logger.Info(clientIP, userId, userName, "WS_DISCONNECT", "")
 		pool.Delete(id)
 		playerStates.Delete(id)
 		log.Println("WebSocket connection closed", userId)

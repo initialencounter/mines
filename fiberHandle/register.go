@@ -2,8 +2,10 @@ package fiberHandle
 
 import (
 	"fmt"
-	"github.com/gofiber/fiber/v2"
 	"main/database"
+	"main/logger"
+
+	"github.com/gofiber/fiber/v2"
 )
 
 type RegisterRequest struct {
@@ -42,6 +44,9 @@ func Register(handler *database.DBHandler, c *fiber.Ctx) error {
 		fmt.Println(err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
+
+	ip := c.IP()
+	logger.Info(ip, "", user, "REGISTER", fmt.Sprintf("email=%s", email))
 
 	t, err := signToken(user)
 	if err != nil {
