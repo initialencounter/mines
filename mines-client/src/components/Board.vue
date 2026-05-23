@@ -122,17 +122,7 @@ const usingPropId = ref<number | null>(null)
 const activeEffects = ref<Record<string, ActivePropEffect>>({})
 
 // 护盾/双倍状态
-const shieldActive = computed(() => {
-  const p = myProps.value['1002']; return p ? p.Count > 0 : false
-})
-const shieldCount = computed(() => {
-  const p = myProps.value['1002']; return p ? p.Count : 0
-})
 const doubleScoreActive = computed(() => !!activeEffects.value[1001])
-const doubleRemaining = computed(() => {
-  const e = activeEffects.value[1001]
-  return e ? Math.max(0, (e.startTime + e.remainingMs - Date.now()) / 1000) : 0
-})
 
 // ========== 棋盘鼠标指针 ==========
 const boardCursor = computed(() => {
@@ -959,22 +949,6 @@ async function reset() {
         退出登录
       </el-button>
 
-      <el-button v-if="hasProp(101)" :style="{ width: 'auto', background: usingPropId === 101 ? '#faad14' : '' }" @click="startUseProp(101)">
-        探测仪 <kbd class="key-hint">{{ keybinds.detector }}</kbd>
-      </el-button>
-      <el-button v-if="hasProp(102)" :style="{ width: 'auto', background: usingPropId === 102 ? '#faad14' : '' }" @click="startUseProp(102)">
-        雷之奥义 <kbd class="key-hint">{{ keybinds.xjbd }}</kbd>
-      </el-button>
-
-      <div v-if="cdRemaining > 0" class="cd-indicator">
-        ⏳ CD {{ cdRemaining.toFixed(1) }}s
-      </div>
-
-      <div style="display: flex; gap: 8px; align-items: center">
-        <span v-if="shieldActive" class="buff-indicator buff-shield">🛡 护盾 x{{ shieldCount }}</span>
-        <span v-if="doubleScoreActive" class="buff-indicator buff-double">⚡ 双倍 {{ doubleRemaining.toFixed(1) }}s</span>
-      </div>
-
       <div class="safe-cells-indicator">
         剩余安全格子 <span class="safe-cells-count">{{ serverSafeCells }}</span>
       </div>
@@ -1093,40 +1067,6 @@ async function reset() {
   background: #9b7353 !important;
 }
 
-.cd-indicator {
-  color: #f87171;
-  font-weight: 700;
-  font-size: 15px;
-  min-width: 115px;
-  text-align: center;
-  flex-shrink: 0;
-  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-  background: rgba(248, 113, 113, 0.1);
-  padding: 3px 10px;
-  border-radius: 6px;
-  border: 1px solid rgba(248, 113, 113, 0.2);
-}
-.buff-indicator {
-  font-size: 13px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 6px;
-  white-space: nowrap;
-  min-width: 110px;
-  text-align: center;
-  flex-shrink: 0;
-  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-}
-.buff-shield {
-  color: #60a5fa;
-  background: rgba(96, 165, 250, 0.12);
-  border: 1px solid rgba(96, 165, 250, 0.2);
-}
-.buff-double {
-  color: #fbbf24;
-  background: rgba(251, 191, 36, 0.12);
-  border: 1px solid rgba(251, 191, 36, 0.2);
-}
 .safe-cells-indicator {
   font-size: 14px;
   font-weight: 600;

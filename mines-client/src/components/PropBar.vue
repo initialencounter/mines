@@ -101,6 +101,9 @@ const iconMap: Record<number, string> = {
           <div class="prop-timer-fill" :style="{ width: `${getTimerPercent(prop.PropID)}%` }" />
         </div>
       </div>
+      <div v-if="cdRemaining > 0" class="cd-indicator">
+        CD {{ cdRemaining.toFixed(1) }}s
+      </div>
       <span v-if="props.props.length === 0" class="prop-empty">暂无道具</span>
     </div>
   </div>
@@ -175,6 +178,17 @@ const iconMap: Record<number, string> = {
   color: #666;
   padding: 0 10px;
   font-style: italic;
+}
+.cd-indicator {
+  color: #f87171;
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+  background: rgba(248, 113, 113, 0.1);
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(248, 113, 113, 0.2);
 }
 .prop-countdown {
   border-color: rgba(96, 165, 250, 0.5) !important;
