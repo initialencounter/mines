@@ -11,7 +11,8 @@
       "Bash(cp \"c:/Users/29115/dev/tapsss/fast-vite-electron/src/render/public/assets/prop\"* \"c:/Users/29115/GolandProjects/src/mines/mines-client/src/assets/\")",
       "Bash(npm install *)",
       "Bash(npx vue-tsc *)",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(go vet *)"
     ]
   }
 }

@@ -10,7 +10,6 @@ import (
 	"main/utils"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
@@ -46,7 +45,6 @@ func main() {
 		log.Fatal(err)
 	}
 	defer handler.Close()
-	// 确认连接有效
 	err = handler.Db.Ping()
 	if err != nil {
 		log.Fatal(err)
@@ -76,6 +74,7 @@ func main() {
 		PathPrefix: "mines-client/src/assets",
 	}))
 
+	// HTTP API 路由
 	app.Post("/register", func(c *fiber.Ctx) error { return fiberHandle.Register(handler, c) })
 	app.Post("/login", func(c *fiber.Ctx) error { return fiberHandle.Login(handler, c) })
 	app.Post("/verify", func(c *fiber.Ctx) error { return fiberHandle.VerifyCode(handler, c, config.Smtp, codeCache) })
@@ -99,6 +98,7 @@ func main() {
 		return c.JSON(fiber.Map{"result": "ok"})
 	})
 
+	// WebSocket 升级中间件
 	app.Use("/ws", func(c *fiber.Ctx) error {
 		if websocket.IsWebSocketUpgrade(c) {
 			c.Locals("allowed", true)
@@ -113,23 +113,22 @@ func main() {
 			return c.Next()
 		}
 		return fiber.ErrUpgradeRequired
-	}, websocket.New(func(c *websocket.Conn) {
-		// Extract token from query parameters
+	}, websocket.New(handleWebSocket(handler, m, &config)))
+
+	log.Fatal(app.Listen(fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)))
+}
+
+// handleWebSocket 返回 WebSocket 连接的处理函数
+func handleWebSocket(handler *database.DBHandler, m *Minefield, config *Config) func(*websocket.Conn) {
+	return func(c *websocket.Conn) {
+		// Token 验证
 		tokenString := c.Query("token")
 		if tokenString == "" {
-			err := c.WriteMessage(websocket.TextMessage, []byte("missing token"))
-			if err != nil {
-				return
-			}
-			err = c.Close()
-			if err != nil {
-				return
-			}
+			c.WriteMessage(websocket.TextMessage, []byte("missing token"))
+			c.Close()
 			return
 		}
-		// Parse and validate token
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Validate the signing method
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fiber.NewError(fiber.StatusUnauthorized, "invalid signing method")
 			}
@@ -137,29 +136,21 @@ func main() {
 		})
 
 		if err != nil || !token.Valid {
-			err := c.WriteMessage(websocket.TextMessage, []byte("invalid token"))
-			if err != nil {
-				return
-			}
-			err = c.Close()
-			if err != nil {
-				return
-			}
+			c.WriteMessage(websocket.TextMessage, []byte("invalid token"))
+			c.Close()
 			return
 		}
 		userId := c.Params("id")
 		id, err := strconv.Atoi(userId)
 		if err != nil {
-			err := c.WriteMessage(websocket.TextMessage, []byte("invalid id"))
-			if err != nil {
-				return
-			}
+			c.WriteMessage(websocket.TextMessage, []byte("invalid id"))
 		}
-		// Add connection to the pool
+
+		// 连接注册
 		pool.Set(id, c)
 		log.Println("New WebSocket connection added")
 
-		// Send initial state to the new player
+		// 获取用户名并缓存
 		userName, err := handler.GetName(id)
 		if err != nil {
 			log.Println("Failed to get username:", err)
@@ -167,51 +158,47 @@ func main() {
 		}
 		nameCache.Set(id, userName)
 
-		// On first player connect, init mines and open 4 zero cells
+		// 首个玩家连接时，布雷并翻开 4 个零值格子
 		var initChangeCell ChangeCell
 		if m.First {
 			initChangeCell = m.initAndOpenFirstCells(4)
 		}
 
+		// 发送初始化消息给新连接
 		initMinefield := m.openMinefield()
-		initMsg := InitMessage{
+		if initBytes, err := json.Marshal(InitMessage{
 			MessageType:    "init",
 			Minefield:      initMinefield,
 			ScoreBoard:     scoreBoard.Board,
 			StartTimeStamp: m.StartTimeStamp,
 			SafeCells:      m.RemainCells(),
 			UserName:       userName,
-		}
-		if initBytes, err := json.Marshal(initMsg); err == nil {
+		}); err == nil {
 			pool.SendToPlayer(id, initBytes)
 		}
 
-		// Broadcast new player join to others
-		joinMsg := Response{
-			NewPlayer: true,
-			UserName:  userName,
-		}
-		if joinBytes, err := json.Marshal(joinMsg); err == nil {
+		// 广播新玩家加入
+		if joinBytes, err := json.Marshal(Response{NewPlayer: true, UserName: userName}); err == nil {
 			pool.BroadcastExcept(id, joinBytes)
 		}
 
-		// Broadcast initial opened cells to all players
+		// 广播初始翻开的格子
 		if len(initChangeCell.Cell) > 0 {
-			initResp := Response{
+			if jsonData, err := json.Marshal(Response{
 				ChangeCell:     initChangeCell,
 				TimeStamp:      m.StartTimeStamp,
 				StartTimeStamp: m.StartTimeStamp,
-			}
-			if jsonData, err := json.Marshal(initResp); err == nil {
+			}); err == nil {
 				pool.BroadcastMessage(jsonData)
 			}
 		}
 
+		// --- 消息处理主循环 ---
 		var (
-			msg []byte
+			msg       []byte
+			newPlayer = false
 		)
-		log.Println(c.Params("id"))
-		var newPlayer = false
+		log.Println(userId)
 		for {
 			if _, msg, err = c.ReadMessage(); err != nil {
 				log.Println("read:", err)
@@ -230,29 +217,27 @@ func main() {
 				nameCache.Set(id, userName)
 			}
 
-			playerState := playerStates.Get(id)
+			ps := playerStates.Get(id)
 
-			// Route by ActionType
+			// 根据 ActionType 路由到对应 handler
 			var response Response
 			switch message.ActionType {
 			case "hint":
-				response = handleHint(&m, message, id, playerState)
+				response = handleHint(m, message, id, ps)
 			case "useDetector":
-				response = handleUseDetector(&m, message, id, playerState, &config)
+				response = handleUseDetector(m, message, id, ps, config)
 			case "useXJBD":
-				response = handleUseXJBD(&m, message, id, playerState, &config)
+				response = handleUseXJBD(m, message, id, ps, config)
 			default:
-				// Normal open/flag flow
-				response = handleNormalAction(&m, message, id, playerState, &config, handler, newPlayer)
+				response = handleNormalAction(m, message, id, ps, config, handler, newPlayer)
 			}
 
+			// 根据 ActionType 分发响应
 			if message.ActionType == "hint" {
 				if jsonData, err := json.Marshal(response); err == nil {
 					pool.SendToPlayer(id, jsonData)
 				}
 			} else if message.ActionType == "useDetector" {
-				// Detector: send mine positions only to the acting player
-				// Broadcast propEffect notification to all others
 				if response.PropEffect != nil {
 					effectResp := Response{
 						MessageType: "propEffect",
@@ -266,17 +251,13 @@ func main() {
 					pool.SendToPlayer(id, jsonData)
 				}
 			} else if message.ActionType == "useXJBD" {
-				// XJBD: broadcast cell changes to ALL players (shared game state)
 				scoreBoard.addScore(response.UserName, response.EarnScore)
 				response.ScoreBoard = scoreBoard.Board
-
 				jsonData, err := json.Marshal(response)
 				if err != nil {
 					fmt.Println(err)
 				}
 				pool.BroadcastMessage(jsonData)
-
-				// Send personalized propBarUpdate to the actor
 				if response.PropBarUpdate != nil {
 					personalResp := Response{
 						MessageType:   "personal",
@@ -287,14 +268,11 @@ func main() {
 					}
 				}
 			} else {
-				// Normal action: broadcast to all
 				jsonData, err := json.Marshal(response)
 				if err != nil {
 					fmt.Println(err)
 				}
 				pool.BroadcastMessage(jsonData)
-
-				// Send personalized propBarUpdate to the acting player
 				if response.PropBarUpdate != nil || response.PropDrop != nil || response.ShieldProtect != nil {
 					personalResp := Response{
 						MessageType:   "personal",
@@ -315,343 +293,14 @@ func main() {
 			newPlayer = false
 		}
 
-		// Remove connection from the pool
+		// 连接断开清理
 		pool.Delete(id)
 		playerStates.Delete(id)
 		log.Println("WebSocket connection closed", userId)
-		var response Response
-		response.PlayerQuit = true
-		response.UserName = userId
-		jsonData, err := json.Marshal(response)
-		if err != nil {
-			fmt.Println(err)
+		exitResp := Response{PlayerQuit: true, UserName: userId}
+		if jsonData, err := json.Marshal(exitResp); err == nil {
+			pool.BroadcastMessage(jsonData)
 		}
-		pool.BroadcastMessage(jsonData)
-		err = c.Close()
-		if err != nil {
-			return
-		}
-
-	}))
-	log.Fatal(app.Listen(fmt.Sprintf("%s:%d", config.Server.Host, config.Server.Port)))
-}
-
-func handleUseDetector(m *Minefield, message Request, playerID int, ps *utils.PlayerState, config *Config) Response {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if !ps.HasProp(PropDetector) {
-		return Response{}
-	}
-
-	ps.UseProp(PropDetector)
-	detectorResult := m.useDetector(message.TargetCell)
-
-	userName, _ := nameCache.GetName(playerID)
-
-	return Response{
-		UserName:       userName,
-		MessageType:    "detectorResult",
-		DetectorResult: &detectorResult,
-		PropBarUpdate:  buildPropBarUpdate(ps),
-		PropEffect: &PropEffectInfo{
-			PropID:     PropDetector,
-			UserName:   userName,
-			TargetCell: message.TargetCell,
-		},
-		TimeStamp:      message.TimeStamp,
-		StartTimeStamp: m.StartTimeStamp,
-		ChangeCell:     ChangeCell{Cell: []Cell{}},
-	}
-}
-
-func handleUseXJBD(m *Minefield, message Request, playerID int, ps *utils.PlayerState, config *Config) Response {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	if !ps.HasProp(PropXJBD) {
-		return Response{}
-	}
-
-	ps.UseProp(PropXJBD)
-	result := m.useXJBD(message.TargetCell)
-
-	if m.IsWind {
-		result = ChangeCell{
-			Result: Result{
-				IsWin:       true,
-				IsBoom:      false,
-				RemainCells: 0,
-				Message:     "You Win!",
-			},
-			Cell: []Cell{},
-		}
-	}
-
-	var timeStamp = message.TimeStamp
-	if m.IsWind && m.EndTimeStamp == 0 {
-		m.EndTimeStamp = timeStamp
-	}
-	if m.IsWind {
-		timeStamp = m.EndTimeStamp
-	}
-
-	doubleScoreActive := ps.IsDoubleScoreActive()
-	inZone := m.anyInDoubleScoreZone(message.Ids)
-	earnScore := calculateScoreWithContext(message, result, doubleScoreActive, inZone)
-
-	userName, _ := nameCache.GetName(playerID)
-
-	return Response{
-		UserName:       userName,
-		ChangeCell:     result,
-		TimeStamp:      timeStamp,
-		StartTimeStamp: m.StartTimeStamp,
-		EarnScore:      earnScore,
-		SafeCells:      m.RemainCells(),
-		PropBarUpdate:  buildPropBarUpdate(ps),
-		PropEffect: &PropEffectInfo{
-			PropID:     PropXJBD,
-			UserName:   userName,
-			TargetCell: message.TargetCell,
-		},
-	}
-}
-
-func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.PlayerState, config *Config, handler *database.DBHandler, newPlayer bool) Response {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	// Check no-flag zone for flag actions
-	if message.IsFlag {
-		for _, id := range message.Ids {
-			if m.isInNoFlagZone(id) {
-				userName, _ := nameCache.GetName(playerID)
-				return Response{
-					NewPlayer:      newPlayer,
-					UserName:       userName,
-					ChangeCell:     ChangeCell{Cell: []Cell{}},
-					TimeStamp:      message.TimeStamp,
-					StartTimeStamp: m.StartTimeStamp,
-					PropBarUpdate:  buildPropBarUpdate(ps),
-				}
-			}
-		}
-	}
-
-	var result ChangeCell
-	if message.IsFlag {
-		result = m.doFlag(message.Ids[0])
-	} else {
-		result = m.openCells(message.Ids)
-	}
-
-	var timeStamp = message.TimeStamp
-	if m.IsWind {
-		result = ChangeCell{
-			Result: Result{
-				IsWin:       true,
-				IsBoom:      false,
-				RemainCells: 0,
-				Message:     "You Win!",
-			},
-			Cell: []Cell{},
-		}
-		if m.EndTimeStamp == 0 {
-			m.EndTimeStamp = timeStamp
-		}
-		timeStamp = m.EndTimeStamp
-	}
-
-	// Shield protection check for mine hit
-	if result.Result.IsBoom && message.ActionType == "" && !message.IsFlag {
-		if ps.ConsumeShield() {
-			// Shield absorbed the hit — keep the mine cell open
-			result.Result.IsBoom = false
-			result.Result.Message = "shield protected"
-
-			shieldCount := ps.GetShieldCount()
-			userName, _ := nameCache.GetName(playerID)
-
-			return Response{
-				NewPlayer:      newPlayer,
-				UserName:       userName,
-				ChangeCell:     result,
-				TimeStamp:      timeStamp,
-				StartTimeStamp: m.StartTimeStamp,
-				EarnScore:      0,
-				ShieldProtect: &ShieldProtect{
-					ShieldCount: shieldCount,
-					CellID:      message.Ids[0],
-					WasMine:     true,
-				},
-				PropBarUpdate: buildPropBarUpdate(ps),
-			}
-		}
-	}
-
-	// Check shield for wrong flag (flag on non-mine)
-	if message.IsFlag && !result.Result.IsBoom && len(result.Cell) > 0 {
-		flaggedCell := m.Cell[message.Ids[0]]
-		if !flaggedCell.IsMine && ps.ConsumeShield() {
-			// Shield absorbed the wrong flag — keep the cell open
-			shieldCount := ps.GetShieldCount()
-			userName, _ := nameCache.GetName(playerID)
-
-			return Response{
-				NewPlayer:      newPlayer,
-				UserName:       userName,
-				ChangeCell:     result,
-				TimeStamp:      timeStamp,
-				StartTimeStamp: m.StartTimeStamp,
-				EarnScore:      0,
-				ShieldProtect: &ShieldProtect{
-					ShieldCount: shieldCount,
-					CellID:      message.Ids[0],
-					WasMine:     false,
-				},
-				PropBarUpdate: buildPropBarUpdate(ps),
-			}
-		}
-	}
-
-	var response Response
-
-	// Prop drop check for normal opens
-	earnScore := scoreCalculatorBase(message, result)
-	doubleScoreActive := false
-	inZone := false
-
-	if !message.IsFlag && result.Result.Message != "shield protected" {
-		var propDrops []PropDropInfo
-		for _, c := range result.Cell {
-			if c.IsOpen && !c.IsMine && c.PropID != 0 {
-				propID := c.PropID
-				ps.AddProp(propID, 1)
-				m.Cell[c.Id].PropID = 0 // clear prop from cell
-
-				def, _ := PropDefs[propID]
-				propDrops = append(propDrops, PropDropInfo{
-					PropID:   propID,
-					PropName: def.Name,
-					Count:    1,
-				})
-
-				// Auto-activate passive props
-				if propID == PropDoubleScore {
-					ps.ActivateDoubleScore(time.Duration(config.Props.DoubleScoreDuration) * time.Second)
-				}
-				if propID == PropShield {
-					ps.AddShield(1)
-				}
-			}
-		}
-		if len(propDrops) > 0 {
-			response.PropDrop = &propDrops[0]
-		}
-
-		doubleScoreActive = ps.IsDoubleScoreActive()
-		inZone = m.anyInDoubleScoreZone(message.Ids)
-		if earnScore > 0 {
-			earnScore = calculateScoreWithContext(message, result, doubleScoreActive, inZone)
-		}
-	}
-
-	response.NewPlayer = newPlayer
-	response.ChangeCell = result
-	response.TimeStamp = timeStamp
-	response.StartTimeStamp = m.StartTimeStamp
-	response.EarnScore = earnScore
-	response.SafeCells = m.RemainCells()
-	response.PropBarUpdate = buildPropBarUpdate(ps)
-	response.ZoneInfo = m.zoneToZoneData()
-
-	if name, ok := nameCache.GetName(playerID); ok {
-		response.UserName = name
-	} else {
-		response.UserName = ""
-	}
-	scoreBoard.addScore(response.UserName, earnScore)
-	response.ScoreBoard = scoreBoard.Board
-
-	return response
-}
-
-func buildPropBarUpdate(ps *utils.PlayerState) *PropBarUpdate {
-	inventory := ps.GetInventory()
-	doubleScoreActive := ps.IsDoubleScoreActive()
-	doubleRemaining := ps.GetDoubleScoreRemaining()
-	shieldCount := ps.GetShieldCount()
-
-	slots := make([]PropSlot, 0)
-	for propID, count := range inventory {
-		def, ok := PropDefs[propID]
-		if !ok {
-			continue
-		}
-		// Double score: only show in inventory while effect is active
-		if propID == PropDoubleScore && !doubleScoreActive {
-			continue
-		}
-		// Shield: sync inventory count with actual ShieldCount
-		if propID == PropShield {
-			count = shieldCount
-			if count <= 0 {
-				continue
-			}
-		}
-		slots = append(slots, PropSlot{
-			PropID: propID,
-			Name:   def.Name,
-			Count:  count,
-		})
-	}
-
-	return &PropBarUpdate{
-		Inventory:            slots,
-		DoubleScoreActive:    doubleScoreActive,
-		DoubleScoreRemaining: doubleRemaining,
-		ShieldCount:          shieldCount,
-	}
-}
-
-func buildPropCounts(config PropConfig) map[int]int {
-	return map[int]int{
-		PropDetector:    config.DetectorCount,
-		PropXJBD:        config.XJBDCount,
-		PropDoubleScore: config.DoubleScoreCount,
-		PropShield:      config.ShieldCount,
-	}
-}
-
-func handleHint(m *Minefield, message Request, playerID int, ps *utils.PlayerState) Response {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	userName, _ := nameCache.GetName(playerID)
-
-	// Find a random unopened, non-mine cell
-	var safeCells []int
-	for i := 0; i < m.Cells; i++ {
-		if !m.Cell[i].IsOpen && !m.Cell[i].IsFlagged && !m.Cell[i].IsMine {
-			safeCells = append(safeCells, i)
-		}
-	}
-	if len(safeCells) == 0 {
-		return Response{
-			UserName:    userName,
-			MessageType: "hintResult",
-			ChangeCell:  ChangeCell{Cell: []Cell{}},
-		}
-	}
-
-	hintID := safeCells[time.Now().UnixNano()%int64(len(safeCells))]
-
-	return Response{
-		UserName:    userName,
-		MessageType: "hintResult",
-		ChangeCell: ChangeCell{
-			Cell: []Cell{{Id: hintID}},
-		},
+		c.Close()
 	}
 }
