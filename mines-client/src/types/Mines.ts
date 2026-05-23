@@ -1,11 +1,17 @@
-import type {ScoreBoard as ScoreBoardType} from "@/types/Request";
-
 interface Cell {
     Id: number
     Mines: number
     IsMine: boolean
     IsOpen: boolean
     IsFlagged: boolean
+}
+
+interface Zone {
+    StartRow: number
+    StartCol: number
+    EndRow: number
+    EndCol: number
+    Type: "doubleScore" | "noFlag"
 }
 
 interface Minefield {
@@ -16,6 +22,38 @@ interface Minefield {
     Cell: Cell[]
     First: boolean
     StartTimeStamp: number
+    Zones?: Zone[]
 }
 
-export type {Minefield, Cell};
+interface PropSlot {
+    PropID: number
+    Name: string
+    Count: number
+}
+
+interface PropBarUpdate {
+    Inventory: PropSlot[]
+    DoubleScoreActive: boolean
+    DoubleScoreRemaining: number
+    ShieldCount: number
+}
+
+interface DetectorResult {
+    CenterCell: number
+    MineCells: number[]
+    SafeCells: number[]
+}
+
+interface PropEffectInfo {
+    PropID: number
+    UserName: string
+    TargetCell: number
+}
+
+interface ShieldProtect {
+    ShieldCount: number
+    CellID: number
+    WasMine: boolean
+}
+
+export type { Minefield, Cell, Zone, PropSlot, PropBarUpdate, DetectorResult, PropEffectInfo, ShieldProtect };

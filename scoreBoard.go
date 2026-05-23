@@ -46,7 +46,8 @@ func newScoreBoard() *ScoreBoard {
 	}
 }
 
-func scoreCalculator(message Request, result ChangeCell) int {
+// scoreCalculatorUnscored returns the base score without multipliers
+func scoreCalculatorBase(message Request, result ChangeCell) int {
 	if message.IsFlag {
 		if result.Result.IsBoom {
 			return 1
@@ -60,6 +61,27 @@ func scoreCalculator(message Request, result ChangeCell) int {
 			return len(result.Cell)
 		}
 	}
+}
+
+// calculateScoreWithContext applies double-score multipliers
+func calculateScoreWithContext(message Request, result ChangeCell, doubleScoreActive bool, inDoubleScoreZone bool) int {
+	base := scoreCalculatorBase(message, result)
+	if base <= 0 {
+		return base // don't multiply negative scores
+	}
+	multiplier := 1
+	if doubleScoreActive {
+		multiplier *= 2
+	}
+	if inDoubleScoreZone {
+		multiplier *= 2
+	}
+	return base * multiplier
+}
+
+// scoreCalculator is kept for backward compatibility
+func scoreCalculator(message Request, result ChangeCell) int {
+	return scoreCalculatorBase(message, result)
 }
 
 func clearScoreBoard(board *ScoreBoard, handler *database.DBHandler, nameCache *utils.NameCache) {

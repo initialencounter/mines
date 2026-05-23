@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/spf13/viper"
 	"log"
 	"main/smtp"
 	"os"
+
+	"github.com/spf13/viper"
 )
 
 type AppConfig struct {
@@ -28,10 +29,20 @@ type DatabaseConfig struct {
 	Password string `mapstructure:"password"`
 }
 
+type PropConfig struct {
+	DetectorCount       int     `mapstructure:"detectorCount"`
+	XJBDCount           int     `mapstructure:"xjbdCount"`
+	DoubleScoreCount    int     `mapstructure:"doubleScoreCount"`
+	ShieldCount         int     `mapstructure:"shieldCount"`
+	DetectorDuration    int     `mapstructure:"detectorDuration"`
+	DoubleScoreDuration int     `mapstructure:"doubleScoreDuration"`
+}
+
 type Config struct {
 	App      AppConfig       `mapstructure:"app"`
 	Server   ServerConfig    `mapstructure:"server"`
 	Mine     MineConfig      `mapstructure:"mine"`
+	Props    PropConfig      `mapstructure:"props"`
 	Database DatabaseConfig  `mapstructure:"database"`
 	Smtp     smtp.MailConfig `mapstructure:"smtp"`
 }
@@ -62,6 +73,13 @@ mine:
   width: 50
   height: 50
   mines: 600
+props:
+  detectorCount: 30
+  xjbdCount: 5
+  doubleScoreCount: 5
+  shieldCount: 10
+  detectorDuration: 10
+  doubleScoreDuration: 10
 database:
   host: "localhost"
   port: 3306

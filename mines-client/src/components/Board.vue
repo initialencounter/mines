@@ -5,21 +5,45 @@
       <ScoreBoard :score-board="totalScoreBoard" :current-game="false" class="score-panel" />
     </div>
     <div class="game-center">
-      <div class="timeWatcher">{{ timeWatcher }}</div>
-      <div
-        :style="{
-          gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
-          gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`,
-        }"
-        class="board"
-      >
+      <PropBar
+        :prop-state="propBarState"
+        :active-prop="activeProp"
+        @update:active-prop="activeProp = $event"
+      />
+      <div class="timeWatcher">用时:{{ timeWatcher }}</div>
+      <div class="board-container">
         <div
-          v-for="(cell, index) in minefield.Cell"
-          :key="index"
-          :style="{ backgroundImage: `url(${getImageSrc(cell)})` }"
-          class="cell"
-          @mousedown="(event) => handleClick(event, index)"
-        ></div>
+          :style="{
+            gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
+            gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`,
+          }"
+          class="board"
+        >
+          <!-- Zone overlays -->
+          <div
+            v-for="(zone, zi) in zones"
+            :key="'z'+zi"
+            class="zone-overlay"
+            :class="zone.Type"
+            :style="zoneStyle(zone)"
+          />
+          <!-- Cells -->
+          <div
+            v-for="(cell, index) in minefield.Cell"
+            :key="index"
+            class="cell-wrapper"
+          >
+            <div
+              :style="{ backgroundImage: `url(${getImageSrc(cell)})` }"
+              class="cell"
+              :class="{
+                'detector-mine': detectorMineCells.has(index),
+                'detector-safe': detectorSafeCells.has(index),
+              }"
+              @mousedown="(event) => handleClick(event, index)"
+            ></div>
+          </div>
+        </div>
       </div>
       <ScoreTip ref="scoreTip" class="scoreTipParent" />
     </div>
@@ -27,7 +51,7 @@
 </template>
 
 <script lang="ts" setup>
-import { ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import axios from "axios";
 import { host, port } from "@/utils";
 import { ElMessage, ElMessageBox } from "element-plus";
@@ -37,9 +61,15 @@ import type {
   RequestType,
   Response,
   ScoreBoard as ScoreBoardType,
+  Zone as ZoneType,
+  PropBarUpdate,
+  DetectorResult,
+  PropEffectInfo,
+  ShieldProtect,
 } from "@/types";
 import ScoreBoard from "@/components/ScoreBoard.vue";
 import ScoreTip from "@/components/ScoreTip.vue";
+import PropBar from "@/components/PropBar.vue";
 import { Howl } from "howler";
 
 const props = defineProps<{
@@ -55,6 +85,23 @@ const minefield = ref<Minefield>({
   Cell: [],
   First: false,
   StartTimeStamp: 0,
+});
+
+// Zone state
+const zones = ref<ZoneType[]>([]);
+
+// Detector highlight state
+const detectorMineCells = ref<Set<number>>(new Set());
+const detectorSafeCells = ref<Set<number>>(new Set());
+const detectorTimer = ref<number | null>(null);
+
+// Prop state
+const activeProp = ref<number | null>(null);
+const propBarState = ref<PropBarUpdate>({
+  Inventory: [],
+  DoubleScoreActive: false,
+  DoubleScoreRemaining: 0,
+  ShieldCount: 0,
 });
 
 const timeWatcher = ref("00:0");
@@ -74,6 +121,33 @@ const openSound = new Howl({
 const flagSound = new Howl({
   src: ["/src/assets/audio/flag.mp3"],
   volume: 0.5,
+});
+
+// Keyboard shortcuts for props
+function hasProp(propId: number): boolean {
+  return propBarState.value.Inventory.some((s) => s.PropID === propId && s.Count > 0);
+}
+function onKeydown(e: KeyboardEvent) {
+  const tag = (e.target as HTMLElement)?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  const key = e.key.toUpperCase();
+  if (key === "D" && hasProp(101)) {
+    e.preventDefault();
+    activeProp.value = activeProp.value === 101 ? null : 101;
+  }
+  if (key === "X" && hasProp(102)) {
+    e.preventDefault();
+    activeProp.value = activeProp.value === 102 ? null : 102;
+  }
+}
+onMounted(() => {
+  window.addEventListener("keydown", onKeydown);
+});
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+  if (detectorTimer.value) clearTimeout(detectorTimer.value);
 });
 
 const getRank = async () => {
@@ -102,6 +176,9 @@ const getBoard = async () => {
     },
   };
   minefield.value = (await axios(config)).data;
+  if (minefield.value.Zones) {
+    zones.value = minefield.value.Zones;
+  }
   totalScoreBoard.value = await getRank();
 };
 
@@ -143,6 +220,34 @@ const getNearbyFlaggedCount = (nearbyCells: number[]) => {
     }
   }
   return count;
+};
+
+const isInNoFlagZone = (index: number): boolean => {
+  const w = minefield.value.Width;
+  const row = Math.floor(index / w);
+  const col = index % w;
+  return zones.value.some(
+    (z) =>
+      z.Type === "noFlag" &&
+      row >= z.StartRow &&
+      row <= z.EndRow &&
+      col >= z.StartCol &&
+      col <= z.EndCol
+  );
+};
+
+const isInDoubleScoreZone = (index: number): boolean => {
+  const w = minefield.value.Width;
+  const row = Math.floor(index / w);
+  const col = index % w;
+  return zones.value.some(
+    (z) =>
+      z.Type === "doubleScore" &&
+      row >= z.StartRow &&
+      row <= z.EndRow &&
+      col >= z.StartCol &&
+      col <= z.EndCol
+  );
 };
 
 const doFlag = (index: number, now: number): number[] => {
@@ -228,6 +333,24 @@ const handleClick = (event: MouseEvent, index: number) => {
     reset();
     return
   }
+
+  // Prop mode: handle prop usage
+  if (activeProp.value !== null) {
+    const propId = activeProp.value;
+    activeProp.value = null;
+    const actionType = propId === 101 ? "useDetector" : "useXJBD";
+    const data: RequestType = {
+      Ids: [],
+      IsFlag: false,
+      TimeStamp: new Date().getTime(),
+      ActionType: actionType,
+      PropID: propId,
+      TargetCell: index,
+    };
+    ws.send(JSON.stringify(data));
+    return;
+  }
+
   let now = new Date().getTime();
   if (!timer) {
     timer = true;
@@ -247,6 +370,11 @@ const handleClick = (event: MouseEvent, index: number) => {
   const shouldFlag = isRightClick !== props.flagMode;
 
   if (shouldFlag) {
+    // Check no-flag zone
+    if (isInNoFlagZone(index)) {
+      ElMessage.warning("该区域禁止标记");
+      return;
+    }
     openCells = doFlag(index, now);
     if (openCells.length > 0) {
       flagSound.play();
@@ -316,11 +444,72 @@ function msToTime(duration: number): string {
   return `${secondsStr}:${milliseconds}`;
 }
 
+function applyDetectorHighlights(result: DetectorResult) {
+  detectorMineCells.value = new Set(result.MineCells);
+  detectorSafeCells.value = new Set(result.SafeCells);
+  if (detectorTimer.value) clearTimeout(detectorTimer.value);
+  detectorTimer.value = window.setTimeout(() => {
+    detectorMineCells.value = new Set();
+    detectorSafeCells.value = new Set();
+  }, 10000);
+}
+
+function zoneStyle(zone: ZoneType) {
+  const left = zone.StartCol * cellSize;
+  const top = zone.StartRow * cellSize;
+  const width = (zone.EndCol - zone.StartCol + 1) * cellSize;
+  const height = (zone.EndRow - zone.StartRow + 1) * cellSize;
+  return {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
+}
+
 ws.onmessage = async (event) => {
   const data: Response = JSON.parse(event.data);
+
+  // Handle personalized messages
+  if (data.MessageType === "detectorResult" && data.DetectorResult) {
+    applyDetectorHighlights(data.DetectorResult);
+    if (data.PropBarUpdate) {
+      propBarState.value = data.PropBarUpdate;
+    }
+    ElMessage.success("探测仪已使用");
+    return;
+  }
+
+  if (data.MessageType === "personal") {
+    if (data.PropBarUpdate) {
+      propBarState.value = data.PropBarUpdate;
+    }
+    if (data.PropDrop) {
+      const names: Record<number, string> = { 101: "探测仪", 102: "雷之奥义", 1001: "双倍积分", 1002: "护盾" };
+      ElMessage.success(`获得道具: ${names[data.PropDrop.PropID] || data.PropDrop.PropName} (+${data.PropDrop.Count})`);
+    }
+    if (data.ShieldProtect) {
+      ElMessage.warning(`护盾保护！剩余 ${data.ShieldProtect.ShieldCount} 个`);
+    }
+    return;
+  }
+
+  if (data.MessageType === "propEffect" && data.PropEffect) {
+    const names: Record<number, string> = { 101: "探测仪", 102: "雷之奥义" };
+    ElMessage.info(`${data.UserName} 使用了${names[data.PropEffect.PropID] || "道具"}`);
+    // Fall through to process ChangeCell if present
+  }
+
+  // Zone info (first connect)
+  if (data.ZoneInfo) {
+    zones.value = data.ZoneInfo;
+  }
+
+  // Score tip animation
   if (data.UserName === userName && data.EarnScore) {
     if (scoreTip.value) {
-      scoreTip.value.tips(data.EarnScore);
+      const isDouble = propBarState.value.DoubleScoreActive;
+      scoreTip.value.tips(data.EarnScore, isDouble);
     }
   }
   if (data.NewPlayer && data.UserName != userName) {
@@ -366,6 +555,20 @@ ws.onmessage = async (event) => {
 
 async function reset() {
   isEnd.value = false;
+  zones.value = [];
+  propBarState.value = {
+    Inventory: [],
+    DoubleScoreActive: false,
+    DoubleScoreRemaining: 0,
+    ShieldCount: 0,
+  };
+  activeProp.value = null;
+  detectorMineCells.value = new Set();
+  detectorSafeCells.value = new Set();
+  if (detectorTimer.value) {
+    clearTimeout(detectorTimer.value);
+    detectorTimer.value = null;
+  }
   await getNewGame();
   await getBoard();
 }
@@ -397,12 +600,88 @@ defineExpose({ reset });
   gap: 8px;
 }
 
+.board-container {
+  position: relative;
+}
+
 .board {
   display: grid;
+  position: relative;
+}
+
+/* Zone overlays */
+.zone-overlay {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5;
+  border-radius: 4px;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.15);
+}
+.zone-overlay.doubleScore {
+  background: rgba(255, 200, 50, 0.35);
+  border: 2px solid rgba(255, 200, 50, 0.7);
+  animation: zone-glow-yellow 2s ease-in-out infinite alternate;
+}
+.zone-overlay.noFlag {
+  background: rgba(255, 60, 50, 0.4);
+  border: 2px solid rgba(255, 60, 50, 0.75);
+  animation: zone-glow-red 2s ease-in-out infinite alternate;
+}
+@keyframes zone-glow-yellow {
+  from {
+    background: rgba(255, 200, 50, 0.25);
+    border-color: rgba(255, 200, 50, 0.5);
+  }
+  to {
+    background: rgba(255, 200, 50, 0.45);
+    border-color: rgba(255, 200, 50, 0.85);
+  }
+}
+@keyframes zone-glow-red {
+  from {
+    background: rgba(255, 60, 50, 0.3);
+    border-color: rgba(255, 60, 50, 0.55);
+  }
+  to {
+    background: rgba(255, 60, 50, 0.5);
+    border-color: rgba(255, 60, 50, 0.9);
+  }
+}
+
+.cell-wrapper {
+  position: relative;
+  width: 24px;
+  height: 24px;
 }
 
 .cell {
+  width: 100%;
+  height: 100%;
   background-size: cover;
+}
+
+/* Detector highlights */
+.cell.detector-mine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 0, 0, 0.5);
+  pointer-events: none;
+  z-index: 7;
+  animation: detector-pulse 0.8s ease-in-out infinite alternate;
+}
+.cell.detector-safe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 230, 120, 0.35);
+  pointer-events: none;
+  z-index: 7;
+  animation: detector-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes detector-pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1.0; }
 }
 
 .timeWatcher {
