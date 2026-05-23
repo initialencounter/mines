@@ -34,6 +34,7 @@ jobs:
         with:
           node-version: 24.x
           cache: pnpm
+          cache-dependency-path: mines-client/pnpm-lock.yaml
 
       - name: install-deps
         run: cd mines-client && pnpm install
