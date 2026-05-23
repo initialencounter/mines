@@ -1,11 +1,27 @@
 <script setup lang="ts">
 import type { ScoreBoard as ScoreBoardType } from '@/types'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 
 const props = defineProps<{ scoreBoard: ScoreBoardType }>()
 
+const activeTab = ref('current')
+const totalRank = ref<ScoreBoardType>({})
+
+function fetchTotalRank() {
+  fetch('/getRank', { method: 'POST' })
+    .then(r => r.json())
+    .then((data) => { totalRank.value = data })
+    .catch(() => {})
+}
+
+function onTabChange(tab: string) {
+  if (tab === 'total')
+    fetchTotalRank()
+}
+
 const sortedEntries = computed(() => {
-  return Object.entries(props.scoreBoard)
+  const source = activeTab.value === 'current' ? props.scoreBoard : totalRank.value
+  return Object.entries(source)
     .map(([name, score]) => ({ name, score }))
     .sort((a, b) => b.score - a.score)
 })
@@ -33,9 +49,10 @@ function getRankIcon(idx: number): string {
 
 <template>
   <div class="scoreboard">
-    <div class="scoreboard-title">
-      <span class="title-icon">🏆</span> 玩家排行
-    </div>
+    <el-tabs v-model="activeTab" class="score-tabs" @tab-change="onTabChange">
+      <el-tab-pane label="本局排行" name="current" />
+      <el-tab-pane label="总积分排行" name="total" />
+    </el-tabs>
     <div
       v-for="(entry, idx) in sortedEntries" :key="entry.name"
       class="score-row" :class="getRankClass(idx)"
@@ -60,20 +77,27 @@ function getRankIcon(idx: number): string {
   background: rgba(255, 255, 255, 0.04);
   backdrop-filter: blur(16px);
   border-radius: 14px;
-  padding: 12px 8px;
+  padding: 4px 8px 12px;
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
-.scoreboard-title {
-  font-weight: 700;
-  font-size: 14px;
-  color: #c0c0c0;
-  margin-bottom: 10px;
-  text-align: center;
-  letter-spacing: 2px;
+.score-tabs {
+  --el-tabs-header-height: 36px;
 }
-.title-icon {
-  margin-right: 4px;
+.score-tabs :deep(.el-tabs__item) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #999;
+  padding: 0 12px;
+}
+.score-tabs :deep(.el-tabs__item.is-active) {
+  color: #60a5fa;
+}
+.score-tabs :deep(.el-tabs__active-bar) {
+  background-color: #60a5fa;
+}
+.score-tabs :deep(.el-tabs__nav-wrap::after) {
+  background-color: rgba(255, 255, 255, 0.06);
 }
 .score-row {
   display: flex;
