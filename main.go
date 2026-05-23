@@ -448,14 +448,7 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 	// Shield protection check for mine hit
 	if result.Result.IsBoom && message.ActionType == "" && !message.IsFlag {
 		if ps.ConsumeShield() {
-			// Shield absorbed the hit — revert the mine cell
-			for i := range result.Cell {
-				cid := result.Cell[i].Id
-				if m.Cell[cid].IsMine {
-					m.Cell[cid].IsOpen = false
-					result.Cell[i].IsOpen = false
-				}
-			}
+			// Shield absorbed the hit — keep the mine cell open
 			result.Result.IsBoom = false
 			result.Result.Message = "shield protected"
 
@@ -483,9 +476,7 @@ func handleNormalAction(m *Minefield, message Request, playerID int, ps *utils.P
 	if message.IsFlag && !result.Result.IsBoom && len(result.Cell) > 0 {
 		flaggedCell := m.Cell[message.Ids[0]]
 		if !flaggedCell.IsMine && ps.ConsumeShield() {
-			// Shield absorbed the wrong flag — revert the cell
-			m.Cell[message.Ids[0]].IsOpen = false
-			result.Cell[0].IsOpen = false
+			// Shield absorbed the wrong flag — keep the cell open
 			shieldCount := ps.GetShieldCount()
 			userName, _ := nameCache.GetName(playerID)
 
