@@ -5,18 +5,29 @@ name: Go
 
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions: write-all
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
+
+    - name: Get version
+      id: get_version
+      shell: bash
+      run: |
+        echo "version=${GITHUB_REF:11}" >> $GITHUB_ENV
       
-    - name: setup node20
-      uses: actions/setup-node@v4
+    - name: setup node24
+      uses: actions/setup-node@v6
       with:
-        node-version: 20
+        node-version: 24
     - name: install-deps
       run: cd mines-client && pnpm install
       
@@ -24,16 +35,27 @@ jobs:
       run: cd mines-client && pnpm run build
       
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v6
       with:
-        go-version: '1.22.4'
+        go-version: '1.26.3'
 
     - name: Build
-      run: go build -o output/mines
+      run: |
+        GOOS=linux GOARCH=amd64 go build -o output/mines-linux-amd64
+        GOOS=windows GOARCH=amd64 go build -o output/mines-windows-amd64.exe
+        GOOS=darwin GOARCH=arm64 go build -o output/mines-darwin-arm64
       
     - name: upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: mines
-        path: output/mines
+        path: output/
 
+    - name: Release
+      uses: softprops/action-gh-release@v3
+      with:
+        files: |
+          output/mines-linux-amd64
+          output/mines-windows-amd64.exe
+          output/mines-darwin-arm64
+        name: 'Mines ${{ env.version }}'
