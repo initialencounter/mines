@@ -500,6 +500,35 @@ func contain(arr []int, target int) bool {
 	return false
 }
 
+// initAndOpenFirstCells places mines without a safe zone and opens n random zero-value cells
+func (m *Minefield) initAndOpenFirstCells(n int) ChangeCell {
+	m.StartTimeStamp = time.Now().UnixMilli()
+	m.First = false
+	m.randomShot(nil)
+	m.countMines()
+
+	var zeroCells []int
+	for i := 0; i < m.Cells; i++ {
+		if !m.Cell[i].IsMine && m.Cell[i].Mines == 0 {
+			zeroCells = append(zeroCells, i)
+		}
+	}
+
+	rand.Shuffle(len(zeroCells), func(i, j int) {
+		zeroCells[i], zeroCells[j] = zeroCells[j], zeroCells[i]
+	})
+
+	if len(zeroCells) > n {
+		zeroCells = zeroCells[:n]
+	}
+
+	if len(zeroCells) == 0 {
+		return ChangeCell{}
+	}
+
+	return m.openCells(zeroCells)
+}
+
 func (m *Minefield) countMines() {
 	for id := 0; id < m.Cells; id++ {
 		round := m.getNearbyCells(id)

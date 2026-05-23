@@ -167,6 +167,12 @@ func main() {
 		}
 		nameCache.Set(id, userName)
 
+		// On first player connect, init mines and open 4 zero cells
+		var initChangeCell ChangeCell
+		if m.First {
+			initChangeCell = m.initAndOpenFirstCells(4)
+		}
+
 		initMinefield := m.openMinefield()
 		initMsg := InitMessage{
 			MessageType:    "init",
@@ -187,6 +193,18 @@ func main() {
 		}
 		if joinBytes, err := json.Marshal(joinMsg); err == nil {
 			pool.BroadcastExcept(id, joinBytes)
+		}
+
+		// Broadcast initial opened cells to all players
+		if len(initChangeCell.Cell) > 0 {
+			initResp := Response{
+				ChangeCell:     initChangeCell,
+				TimeStamp:      m.StartTimeStamp,
+				StartTimeStamp: m.StartTimeStamp,
+			}
+			if jsonData, err := json.Marshal(initResp); err == nil {
+				pool.BroadcastMessage(jsonData)
+			}
 		}
 
 		var (
