@@ -1,53 +1,47 @@
 <template>
-  <div class="common-layout">
-    <el-container>
-      <el-header></el-header>
-      <el-main>
-        <el-form ref="ruleFormRef"
-                 v-loading="loading"
-                 :model="ruleForm"
-                 :rules="rules"
-                 :size="formSize"
-                 label-width="auto"
-                 status-icon
-                 style="max-width: 24rem"
-        >
-          <el-form-item>
-            <h1>{{ modes.register ? "注册模式" : (modes.login ? "亲，请登录" : "找回密码，若忘记用户名，请联系管理员！") }}</h1>
-          </el-form-item>
-          <el-form-item label="用户名" prop="userName">
-            <el-input v-model="ruleForm.userName"/>
-          </el-form-item>
-          <el-form-item v-if="!modes.verify" :label="(modes.reset?'新密码':'密码')" prop="password">
-            <el-input v-model="ruleForm.password" type="password"/>
-          </el-form-item>
-          <el-form-item v-if="!modes.login && !modes.verify" label="确认密码" prop="checkPass">
-            <el-input v-model="ruleForm.checkPass" type="password"/>
-          </el-form-item>
-          <el-form-item v-if="modes.register || modes.verify" label="email" prop="email">
-            <el-input v-model="ruleForm.email"/>
-          </el-form-item>
-          <el-form-item v-if="modes.reset" label="验证码" prop="code">
-            <el-input v-model="ruleForm.code"/>
-          </el-form-item>
-          <el-form-item>
-            <div class="config-button">
-              <el-button v-if="modes.verify" type="primary" @click="submitForm(ruleFormRef)">发送验证码</el-button>
-              <el-button v-if="!modes.verify" type="primary" @click="submitForm(ruleFormRef)">
-                {{ modes.register ? "注册" : (modes.login ? "登录" : "重置密码") }}
-              </el-button>
-              <el-button type="danger" @click="resetForm(ruleFormRef)">清空</el-button>
-              <el-button type="info" @click="visitorModeLogin">游客</el-button>
-              <p></p>
-              <el-button v-if="!modes.login" type="primary" @click="switchMode('login')">登录</el-button>
-              <el-button v-if="!modes.register" type="primary" @click="switchMode('register')">注册</el-button>
-              <el-button v-if="!modes.verify && !modes.reset" type="primary" @click="switchMode('verify')">忘记密码</el-button>
-            </div>
-          </el-form-item>
-        </el-form>
-      </el-main>
-      <el-footer></el-footer>
-    </el-container>
+  <div class="login-wrapper">
+    <el-form ref="ruleFormRef"
+             v-loading="loading"
+             :model="ruleForm"
+             :rules="rules"
+             :size="formSize"
+             label-width="auto"
+             status-icon
+             class="login-form"
+    >
+      <el-form-item>
+        <h1 class="login-title">{{ modes.register ? "注册模式" : (modes.login ? "亲，请登录" : "找回密码，若忘记用户名，请联系管理员！") }}</h1>
+      </el-form-item>
+      <el-form-item label="用户名" prop="userName">
+        <el-input v-model="ruleForm.userName"/>
+      </el-form-item>
+      <el-form-item v-if="!modes.verify" :label="(modes.reset?'新密码':'密码')" prop="password">
+        <el-input v-model="ruleForm.password" type="password"/>
+      </el-form-item>
+      <el-form-item v-if="!modes.login && !modes.verify" label="确认密码" prop="checkPass">
+        <el-input v-model="ruleForm.checkPass" type="password"/>
+      </el-form-item>
+      <el-form-item v-if="modes.register || modes.verify" label="email" prop="email">
+        <el-input v-model="ruleForm.email"/>
+      </el-form-item>
+      <el-form-item v-if="modes.reset" label="验证码" prop="code">
+        <el-input v-model="ruleForm.code"/>
+      </el-form-item>
+      <el-form-item>
+        <div class="config-button">
+          <el-button v-if="modes.verify" type="primary" @click="submitForm(ruleFormRef)">发送验证码</el-button>
+          <el-button v-if="!modes.verify" type="primary" @click="submitForm(ruleFormRef)">
+            {{ modes.register ? "注册" : (modes.login ? "登录" : "重置密码") }}
+          </el-button>
+          <el-button type="danger" @click="resetForm(ruleFormRef)">清空</el-button>
+          <el-button type="info" @click="visitorModeLogin">游客</el-button>
+          <p></p>
+          <el-button v-if="!modes.login" type="primary" @click="switchMode('login')">登录</el-button>
+          <el-button v-if="!modes.register" type="primary" @click="switchMode('register')">注册</el-button>
+          <el-button v-if="!modes.verify && !modes.reset" type="primary" @click="switchMode('verify')">忘记密码</el-button>
+        </div>
+      </el-form-item>
+    </el-form>
   </div>
 </template>
 
@@ -207,22 +201,46 @@ const visitorModeLogin = () => {
 
 </script>
 
-<style>
-
-.el-form {
-  background: rgba(121, 187, 255, 0.18);
-  padding: 2rem;
-  display: block;
-  margin:auto;
-  border-radius: 0.8rem;
+<style scoped>
+.login-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 80vh;
 }
 
-.el-item {
-  margin: 1rem;
+.login-form {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px);
+  border-radius: 14px;
+  padding: 2rem;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  max-width: 28rem;
+  width: 100%;
+}
+
+html:not(.dark) .login-form {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.login-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #d0d0d0;
+  text-align: center;
+}
+
+html:not(.dark) .login-title {
+  color: #334155;
 }
 
 .config-button {
-  display: block;
-  margin:auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
 }
 </style>

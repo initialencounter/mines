@@ -1,20 +1,8 @@
 <script setup lang="ts">
-import { useDark, useToggle } from "@vueuse/core";
-import { Moon, Sunny } from '@element-plus/icons-vue'
-const isDark = useDark();
-const toggleDark = useToggle(isDark);
 </script>
 
 <template>
   <div class="foot-container">
-    <div  class="icon-btn" @click="toggleDark()">
-      <div v-if="isDark">
-        <el-icon><Moon /></el-icon>
-      </div>
-      <div v-else>
-        <el-icon><Sunny /></el-icon>
-      </div>
-    </div>
     <a class="icon-btn"
       href="https://github.com/initialencounter/mines"
       title="GitHub"
@@ -32,22 +20,39 @@ const toggleDark = useToggle(isDark);
         />
       </svg>
     </a>
-</div>
+  </div>
 </template>
 
-<style>
-.foot-container{
+<style scoped>
+.foot-container {
   display: flex;
   justify-content: center;
+  align-items: center;
 }
+
 .icon-btn {
   cursor: pointer;
-  width: 1.2rem;
-  height: 1.2rem;
-  background-color: transparent;
-  display: block;
-  margin: 0 0.5rem;
-  cursor: pointer;
-  border-radius: 0;
+  width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  transition:
+    color 0.2s,
+    transform 0.2s;
+}
+
+.icon-btn:hover {
+  color: #d0d0d0;
+  transform: scale(1.15);
+}
+
+html:not(.dark) .icon-btn {
+  color: #64748b;
+}
+
+html:not(.dark) .icon-btn:hover {
+  color: #334155;
 }
 </style>

@@ -1,34 +1,28 @@
 <template>
-  <div class="rankView">
-    <ScoreBoard :scoreBoard="scoreBoard" class="scoreBoard"></ScoreBoard>
-    <ScoreBoard :scoreBoard="totalScoreBoard" class="TotalBoard"></ScoreBoard>
-  </div>
-  <div class="timeWatcher">{{ timeWatcher }}</div>
-  <div class="topPositionFixed">
-    <el-button class="logout-button" style="width: 5rem" @click="logout">退出登录</el-button>
-    <el-button
-      :style="{ background: flagMode ? '#5282b8' : '#5c8f4b', width: '5rem'}"
-      class="flag-switch-button"
-      @click="flagMode = !flagMode"
-      >{{ flagMode ? "标记" : "挖开" }}模式
-    </el-button>
-    <el-button class="logout-button" style="width: 5rem" @click="reset">重置</el-button>
-    <ScoreTip ref="scoreTip" class="scoreTipParent"></ScoreTip>
-  </div>
-  <div
-    :style="{
-      gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
-      gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`,
-    }"
-    class="board"
-  >
-    <div
-      v-for="(cell, index) in minefield.Cell"
-      :key="index"
-      :style="{ backgroundImage: `url(${getImageSrc(cell)})` }"
-      class="cell"
-      @mousedown="(event) => handleClick(event, index)"
-    ></div>
+  <div class="game-area">
+    <div class="game-left">
+      <ScoreBoard :score-board="scoreBoard" :current-game="true" class="score-panel" />
+      <ScoreBoard :score-board="totalScoreBoard" :current-game="false" class="score-panel" />
+    </div>
+    <div class="game-center">
+      <div class="timeWatcher">{{ timeWatcher }}</div>
+      <div
+        :style="{
+          gridTemplateColumns: `repeat(${minefield.Width}, ${cellSize}px)`,
+          gridTemplateRows: `repeat(${minefield.Height}, ${cellSize}px)`,
+        }"
+        class="board"
+      >
+        <div
+          v-for="(cell, index) in minefield.Cell"
+          :key="index"
+          :style="{ backgroundImage: `url(${getImageSrc(cell)})` }"
+          class="cell"
+          @mousedown="(event) => handleClick(event, index)"
+        ></div>
+      </div>
+      <ScoreTip ref="scoreTip" class="scoreTipParent" />
+    </div>
   </div>
 </template>
 
@@ -48,6 +42,10 @@ import ScoreBoard from "@/components/ScoreBoard.vue";
 import ScoreTip from "@/components/ScoreTip.vue";
 import { Howl } from "howler";
 
+const props = defineProps<{
+  flagMode: boolean;
+}>();
+
 const cellSize = 24;
 const minefield = ref<Minefield>({
   Width: 5,
@@ -59,8 +57,7 @@ const minefield = ref<Minefield>({
   StartTimeStamp: 0,
 });
 
-const showLogin = defineModel<boolean>({ required: true });
-const timeWatcher = ref("00:000");
+const timeWatcher = ref("00:0");
 let startTimeStamp = 0;
 document.oncontextmenu = () => false;
 const userId = localStorage.getItem("userId");
@@ -78,7 +75,7 @@ const flagSound = new Howl({
   src: ["/src/assets/audio/flag.mp3"],
   volume: 0.5,
 });
-const flagMode = ref(false);
+
 const getRank = async () => {
   let config = {
     method: "post",
@@ -247,7 +244,7 @@ const handleClick = (event: MouseEvent, index: number) => {
   openSound.stop();
 
   const isRightClick = event.button === 2;
-  const shouldFlag = isRightClick !== flagMode.value;
+  const shouldFlag = isRightClick !== props.flagMode;
 
   if (shouldFlag) {
     openCells = doFlag(index, now);
@@ -284,39 +281,35 @@ const getImageSrc = (cell: Cell) => {
 };
 
 const getNearbyCells = (cell: number) => {
-  let nearbyCells = []; //center
+  let nearbyCells = [];
   let width = minefield.value.Width;
   let height = minefield.value.Height;
   let x = cell % width;
   let y = Math.floor(cell / width);
 
-  let isNotFirstRow = y > 0; // 不在第一排
-  let isNotLastRow = y < height - 1; // 不在最后一排
+  let isNotFirstRow = y > 0;
+  let isNotLastRow = y < height - 1;
 
-  if (isNotFirstRow) nearbyCells.push(cell - width); //up
-  if (isNotLastRow) nearbyCells.push(cell + width); //down
+  if (isNotFirstRow) nearbyCells.push(cell - width);
+  if (isNotLastRow) nearbyCells.push(cell + width);
 
   if (x > 0) {
-    //if cell isn't on first column
-    nearbyCells.push(cell - 1); //left
-
-    if (isNotFirstRow) nearbyCells.push(cell - width - 1); //up left
-    if (isNotLastRow) nearbyCells.push(cell + width - 1); //down left
+    nearbyCells.push(cell - 1);
+    if (isNotFirstRow) nearbyCells.push(cell - width - 1);
+    if (isNotLastRow) nearbyCells.push(cell + width - 1);
   }
 
   if (x < width - 1) {
-    //if cell isn't on last column
-    nearbyCells.push(cell + 1); //right
-
-    if (isNotFirstRow) nearbyCells.push(cell - width + 1); //up right
-    if (isNotLastRow) nearbyCells.push(cell + width + 1); //down right
+    nearbyCells.push(cell + 1);
+    if (isNotFirstRow) nearbyCells.push(cell - width + 1);
+    if (isNotLastRow) nearbyCells.push(cell + width + 1);
   }
 
   return nearbyCells;
 };
 
 function msToTime(duration: number): string {
-  const milliseconds = duration % 1000;
+  const milliseconds = duration % 10;
   const seconds = Math.floor(duration / 1000);
   const secondsStr = seconds < 10 ? "0" + seconds : seconds;
 
@@ -371,22 +364,40 @@ ws.onmessage = async (event) => {
   }
 };
 
-function logout() {
-  localStorage.removeItem("jwt");
-  localStorage.removeItem("userId");
-  showLogin.value = true;
-}
-
 async function reset() {
   isEnd.value = false;
   await getNewGame();
   await getBoard();
 }
+
+defineExpose({ reset });
 </script>
 
 <style scoped>
-.board {
+.game-area {
+  display: flex;
   justify-content: center;
+  align-items: flex-start;
+  height: 100%;
+  padding: 20px;
+  gap: 20px;
+}
+
+.game-left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.game-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.board {
   display: grid;
 }
 
@@ -395,26 +406,8 @@ async function reset() {
 }
 
 .timeWatcher {
-  position: fixed;
-  top: 0;
   font-size: 26px;
   font-weight: bold;
   color: #00bd7e;
-  z-index: 100;
-  pointer-events: none
-}
-
-.topPositionFixed {
-  position: fixed;
-  top: 4%;
-  left: 0;
-  justify-content: center;
-  display: flex;
-}
-
-.rankView {
-  position: fixed;
-  left: 0;
-  pointer-events: none
 }
 </style>
