@@ -18,10 +18,10 @@ jobs:
       with:
         node-version: 20
     - name: install-deps
-      run: cd mines-client && npm install
+      run: cd mines-client && pnpm install
       
     - name: build-client
-      run: cd mines-client && npm run build
+      run: cd mines-client && pnpm run build
       
     - name: Set up Go
       uses: actions/setup-go@v4
